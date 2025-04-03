@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">DraftDeck</string>
+
+    <!-- Notification Channel -->
+    <string name="notification_channel_name">Thesis Updates</string>
+    <string name="notification_channel_description">Notifications for thesis submissions, feedback, and status updates</string>
+
 </resources>

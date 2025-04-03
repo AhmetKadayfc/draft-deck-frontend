@@ -2,7 +2,7 @@ package com.example.draftdeck.domain.util
 
 object Constants {
     // API Endpoints
-    const val BASE_URL = "https://api.draftdeck.example.com/"
+    const val BASE_URL = "http://10.0.2.2:5000/"
 
     // Preferences Keys
     const val PREFERENCES_NAME = "draft_deck_preferences"

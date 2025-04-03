@@ -10,16 +10,23 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.auth.AuthViewModel
 import com.example.draftdeck.ui.auth.EmailConfirmationScreen
 import com.example.draftdeck.ui.auth.LoginScreen
 import com.example.draftdeck.ui.auth.RegisterScreen
 import com.example.draftdeck.ui.auth.WelcomeScreen
+import com.example.draftdeck.ui.dashboard.AdvisorDashboard
 import com.example.draftdeck.ui.dashboard.DashboardViewModel
 import com.example.draftdeck.ui.dashboard.StudentDashboard
 import com.example.draftdeck.ui.feedback.AddFeedbackScreen
+import com.example.draftdeck.ui.feedback.FeedbackDetailScreen
 import com.example.draftdeck.ui.feedback.FeedbackScreen
 import com.example.draftdeck.ui.feedback.FeedbackViewModel
+import com.example.draftdeck.ui.notifications.NotificationScreen
+import com.example.draftdeck.ui.notifications.NotificationViewModel
+import com.example.draftdeck.ui.profile.ProfileScreen
+import com.example.draftdeck.ui.profile.ProfileViewModel
 import com.example.draftdeck.ui.thesis.ThesisDetailScreen
 import com.example.draftdeck.ui.thesis.ThesisViewModel
 import com.example.draftdeck.ui.thesis.UploadThesisScreen
@@ -33,7 +40,7 @@ fun AppNavHost(
     val authViewModel: AuthViewModel = hiltViewModel()
 
     // Check if user is logged in
-    val isLoggedIn by authViewModel.isLoggedIn.collectAsState(initial = true)
+    val isLoggedIn by authViewModel.isLoggedIn.collectAsState(initial = false)
     val startDestination = if (isLoggedIn) Screen.ThesisList.route else Screen.Welcome.route
 
     NavHost(
@@ -88,27 +95,51 @@ fun AppNavHost(
         // Main screens
         composable(Screen.ThesisList.route) {
             val viewModel: DashboardViewModel = hiltViewModel()
-            StudentDashboard(
-                viewModel = viewModel,
-                onNavigateToThesisDetail = { thesisId ->
-                    navController.navigate(Screen.ThesisDetail.createRoute(thesisId))
-                },
-                onNavigateToUploadThesis = {
-                    navController.navigate(Screen.UploadThesis.route)
-                },
-                onNavigateToProfile = {
-                    navController.navigate(Screen.Profile.route)
-                },
-                onNavigateToNotifications = {
-                    navController.navigate(Screen.Notifications.route)
-                },
-                onLogout = {
-                    authViewModel.logout()
-                    navController.navigate(Screen.Welcome.route) {
-                        popUpTo(Screen.ThesisList.route) { inclusive = true }
+            val currentUser by viewModel.currentUser.collectAsState(initial = null)
+
+            if (currentUser?.role == Constants.ROLE_STUDENT){
+                StudentDashboard(
+                    viewModel = viewModel,
+                    onNavigateToThesisDetail = { thesisId ->
+                        navController.navigate(Screen.ThesisDetail.createRoute(thesisId))
+                    },
+                    onNavigateToUploadThesis = {
+                        navController.navigate(Screen.UploadThesis.route)
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route)
+                    },
+                    onLogout = {
+                        authViewModel.logout()
+                        navController.navigate(Screen.Welcome.route) {
+                            popUpTo(Screen.ThesisList.route) { inclusive = true }
+                        }
                     }
-                }
-            )
+                )
+            }
+             else {
+                AdvisorDashboard(
+                    viewModel = viewModel,
+                    onNavigateToThesisDetail = { thesisId ->
+                        navController.navigate(Screen.ThesisDetail.createRoute(thesisId))
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route)
+                    },
+                    onLogout = {
+                        authViewModel.logout()
+                        navController.navigate(Screen.Welcome.route) {
+                            popUpTo(Screen.ThesisList.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
 
         composable(
@@ -222,7 +253,48 @@ fun AppNavHost(
             val feedbackId = backStackEntry.arguments?.getString("feedbackId") ?: ""
             val viewModel: FeedbackViewModel = hiltViewModel()
 
-            // We'll implement this screen later
+            FeedbackDetailScreen(
+                feedbackId = feedbackId,
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onNavigateToUpdateFeedback = { feedbackId ->
+                    // Navigate to update feedback (not implemented separately,
+                    // could reuse AddFeedbackScreen with isUpdate = true)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Profile and notification screens
+        composable(Screen.Profile.route) {
+            val viewModel: ProfileViewModel = hiltViewModel()
+
+            ProfileScreen(
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onLogout = {
+                    authViewModel.logout()
+                    navController.navigate(Screen.Welcome.route) {
+                        popUpTo(Screen.ThesisList.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Notifications.route) {
+            val viewModel: NotificationViewModel = hiltViewModel()
+
+            NotificationScreen(
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onNavigateToRelatedItem = { type, itemId ->
+                    when (type) {
+                        "Feedback" -> navController.navigate(Screen.FeedbackDetail.createRoute(itemId))
+                        "StatusUpdate", "Reminder" -> navController.navigate(Screen.ThesisDetail.createRoute(itemId))
+                        else -> navController.popBackStack()
+                    }
+                }
+            )
         }
     }
 }

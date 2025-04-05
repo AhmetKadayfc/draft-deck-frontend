@@ -23,6 +23,10 @@ data class VerifyEmailRequest(
     val code: String
 )
 
+data class ResendVerificationRequest(
+    val email: String
+)
+
 data class AuthResponse(
     val token: String,
     val user: UserDto
@@ -42,7 +46,7 @@ interface AuthApi {
     suspend fun verifyEmail(@Body request: VerifyEmailRequest): Response<AuthResponse>
 
     @POST("auth/resend-verification")
-    suspend fun resendVerification(@Body email: String): Response<Unit>
+    suspend fun resendVerification(@Body request: ResendVerificationRequest): Response<Unit>
 
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body email: String): Response<Unit>

@@ -45,6 +45,7 @@ fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    onNavigateToEmailVerification: (String) -> Unit,
     email: String? = null,
     fromVerification: Boolean = false,
     modifier: Modifier = Modifier
@@ -71,8 +72,20 @@ fun LoginScreen(
                 viewModel.resetLoginState()
             }
             is NetworkResult.Error -> {
+                val error = (loginState as NetworkResult.Error).exception.message ?: "Login failed"
+                
+                if (error.contains("403", ignoreCase = true)) {
+                    val emailToVerify = emailState.takeIf { it.isNotEmpty() } ?: email
+                    
+                    if (!emailToVerify.isNullOrEmpty()) {
+                        onNavigateToEmailVerification(emailToVerify)
+                        viewModel.resetLoginState()
+                        return@LaunchedEffect
+                    }
+                }
+                
                 isError = true
-                errorMessage = (loginState as NetworkResult.Error).exception.message ?: "Login failed"
+                errorMessage = error
                 showSuccessMessage = false
             }
             else -> {}
@@ -185,6 +198,15 @@ fun LoginScreen(
                 ) {
                     Text("Login")
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Password forgotten?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { /* Handle password reset */ }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 

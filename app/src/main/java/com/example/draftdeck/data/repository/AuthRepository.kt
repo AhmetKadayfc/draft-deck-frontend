@@ -6,6 +6,7 @@ import com.example.draftdeck.data.remote.api.AuthApi
 import com.example.draftdeck.data.remote.api.LoginRequest
 import com.example.draftdeck.data.remote.api.RegisterRequest
 import com.example.draftdeck.data.remote.api.VerifyEmailRequest
+import com.example.draftdeck.data.remote.api.ResendVerificationRequest
 import com.example.draftdeck.data.remote.dto.toUser
 import com.example.draftdeck.domain.util.SessionManager
 import kotlinx.coroutines.flow.Flow
@@ -111,7 +112,8 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun resendVerification(email: String): Flow<NetworkResult<Unit>> = flow {
         emit(NetworkResult.Loading)
         try {
-            val response = authApi.resendVerification(email)
+            val request = ResendVerificationRequest(email)
+            val response = authApi.resendVerification(request)
 
             if (response.isSuccessful) {
                 emit(NetworkResult.Success(Unit))

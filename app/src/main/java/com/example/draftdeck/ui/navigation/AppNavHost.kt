@@ -86,7 +86,11 @@ fun AppNavHost(
                         popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
                 },
-                onNavigateToRegister = { navController.navigate(Screen.Register.route) }
+                onNavigateToRegister = { navController.navigate(Screen.Register.route) },
+                onNavigateToEmailVerification = { unverifiedEmail ->
+                    // Navigate to email verification screen with the unverified email
+                    navController.navigate(Screen.EmailConfirmation.createRoute(unverifiedEmail))
+                }
             )
         }
 

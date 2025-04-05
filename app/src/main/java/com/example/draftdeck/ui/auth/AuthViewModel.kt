@@ -31,20 +31,30 @@ class AuthViewModel @Inject constructor(
     private val resendVerificationUseCase: ResendVerificationUseCase
 ) : ViewModel() {
 
-    private val _loginState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Loading)
+    private val _loginState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Idle)
     val loginState: StateFlow<NetworkResult<User>> = _loginState
 
-    private val _registerState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Loading)
+    private val _registerState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Idle)
     val registerState: StateFlow<NetworkResult<User>> = _registerState
 
-    private val _logoutState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Loading)
+    private val _logoutState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
     val logoutState: StateFlow<NetworkResult<Unit>> = _logoutState
     
-    private val _verifyEmailState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Loading)
+    private val _verifyEmailState = MutableStateFlow<NetworkResult<User>>(NetworkResult.Idle)
     val verifyEmailState: StateFlow<NetworkResult<User>> = _verifyEmailState
     
-    private val _resendVerificationState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Loading)
+    private val _resendVerificationState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
     val resendVerificationState: StateFlow<NetworkResult<Unit>> = _resendVerificationState
+    
+    // Password reset states
+    private val _requestPasswordResetState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
+    val requestPasswordResetState: StateFlow<NetworkResult<Unit>> = _requestPasswordResetState
+    
+    private val _verifyPasswordResetCodeState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
+    val verifyPasswordResetCodeState: StateFlow<NetworkResult<Unit>> = _verifyPasswordResetCodeState
+    
+    private val _resetPasswordState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
+    val resetPasswordState: StateFlow<NetworkResult<Unit>> = _resetPasswordState
 
     val currentUser: StateFlow<User?> = getCurrentUserUseCase()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -55,9 +65,18 @@ class AuthViewModel @Inject constructor(
     private val _currentEmail = MutableStateFlow<String?>(null)
     val currentEmail: StateFlow<String?> = _currentEmail
     
+    // Store the verification code after it's verified
+    private val _verificationCode = MutableStateFlow<String?>(null)
+    val verificationCode: StateFlow<String?> = _verificationCode
+    
     // Method to set the current email directly
     fun setCurrentEmail(email: String) {
         _currentEmail.value = email
+    }
+    
+    // Method to set the verification code
+    fun setVerificationCode(code: String) {
+        _verificationCode.value = code
     }
 
     fun login(email: String, password: String) {
@@ -105,22 +124,70 @@ class AuthViewModel @Inject constructor(
     }
 
     fun resetLoginState() {
-        _loginState.value = NetworkResult.Loading
+        _loginState.value = NetworkResult.Idle
     }
 
     fun resetRegisterState() {
-        _registerState.value = NetworkResult.Loading
+        _registerState.value = NetworkResult.Idle
     }
 
     fun resetLogoutState() {
-        _logoutState.value = NetworkResult.Loading
+        _logoutState.value = NetworkResult.Idle
     }
     
     fun resetVerifyEmailState() {
-        _verifyEmailState.value = NetworkResult.Loading
+        _verifyEmailState.value = NetworkResult.Idle
     }
     
     fun resetResendVerificationState() {
-        _resendVerificationState.value = NetworkResult.Loading
+        _resendVerificationState.value = NetworkResult.Idle
+    }
+
+    fun requestPasswordReset(email: String) {
+        _currentEmail.value = email
+        viewModelScope.launch {
+            val repository = loginUseCase.getRepository() // Assuming you have access to repository via use case
+            repository.resetPassword(email).collectLatest { result ->
+                _requestPasswordResetState.value = result
+            }
+        }
+    }
+    
+    fun verifyPasswordResetCode(code: String) {
+        val email = _currentEmail.value ?: return
+        viewModelScope.launch {
+            val repository = loginUseCase.getRepository()
+            repository.verifyPasswordResetCode(email, code).collectLatest { result ->
+                _verifyPasswordResetCodeState.value = result
+                if (result is NetworkResult.Success) {
+                    // Save the code for the next step
+                    setVerificationCode(code)
+                }
+            }
+        }
+    }
+    
+    fun resetPassword(newPassword: String) {
+        val email = _currentEmail.value ?: return
+        val code = _verificationCode.value ?: return
+        viewModelScope.launch {
+            val repository = loginUseCase.getRepository()
+            repository.completePasswordReset(email, newPassword, code).collectLatest { result ->
+                _resetPasswordState.value = result
+            }
+        }
+    }
+    
+    // Reset state methods for password reset flows
+    fun resetRequestPasswordResetState() {
+        _requestPasswordResetState.value = NetworkResult.Idle
+    }
+    
+    fun resetVerifyPasswordResetCodeState() {
+        _verifyPasswordResetCodeState.value = NetworkResult.Idle
+    }
+    
+    fun resetResetPasswordState() {
+        _resetPasswordState.value = NetworkResult.Idle
     }
 }

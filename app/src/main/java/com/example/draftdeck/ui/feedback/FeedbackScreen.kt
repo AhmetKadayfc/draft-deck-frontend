@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.example.draftdeck.data.model.User
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.data.remote.handle
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.ErrorView
@@ -110,6 +111,9 @@ fun FeedbackScreen(
                 .padding(paddingValues)
         ) {
             when (val result = feedbackList) {
+                is NetworkResult.Idle -> {
+                    // Initial state, nothing to display yet
+                }
                 is NetworkResult.Loading -> {
                     LoadingIndicator(fullScreen = true)
                 }

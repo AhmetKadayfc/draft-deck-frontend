@@ -7,6 +7,9 @@ import com.example.draftdeck.data.remote.api.LoginRequest
 import com.example.draftdeck.data.remote.api.RegisterRequest
 import com.example.draftdeck.data.remote.api.VerifyEmailRequest
 import com.example.draftdeck.data.remote.api.ResendVerificationRequest
+import com.example.draftdeck.data.remote.api.ResetPasswordRequest
+import com.example.draftdeck.data.remote.api.VerifyPasswordResetCodeRequest
+import com.example.draftdeck.data.remote.api.CompletePasswordResetRequest
 import com.example.draftdeck.data.remote.dto.toUser
 import com.example.draftdeck.domain.util.SessionManager
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +25,8 @@ interface AuthRepository {
     suspend fun resetPassword(email: String): Flow<NetworkResult<Unit>>
     suspend fun verifyEmail(email: String, code: String): Flow<NetworkResult<User>>
     suspend fun resendVerification(email: String): Flow<NetworkResult<Unit>>
+    suspend fun verifyPasswordResetCode(email: String, code: String): Flow<NetworkResult<Unit>>
+    suspend fun completePasswordReset(email: String, newPassword: String, code: String): Flow<NetworkResult<Unit>>
     fun getCurrentUser(): Flow<User?>
     suspend fun clearSession()
 }
@@ -153,10 +158,52 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun resetPassword(email: String): Flow<NetworkResult<Unit>> = flow {
+        // Emit Loading state to indicate an active request
         emit(NetworkResult.Loading)
         try {
-            val response = authApi.resetPassword(email)
+            val request = ResetPasswordRequest(email)
+            val response = authApi.resetPassword(request)
+            
+            if (response.isSuccessful) {
+                emit(NetworkResult.Success(Unit))
+            } else {
+                emit(NetworkResult.Error(HttpException(response)))
+            }
+        } catch (e: HttpException) {
+            emit(NetworkResult.Error(e))
+        } catch (e: IOException) {
+            emit(NetworkResult.Error(e))
+        } catch (e: Exception) {
+            emit(NetworkResult.Error(e))
+        }
+    }
 
+    override suspend fun verifyPasswordResetCode(email: String, code: String): Flow<NetworkResult<Unit>> = flow {
+        emit(NetworkResult.Loading)
+        try {
+            val request = VerifyPasswordResetCodeRequest(email, code)
+            val response = authApi.verifyPasswordResetCode(request)
+            
+            if (response.isSuccessful) {
+                emit(NetworkResult.Success(Unit))
+            } else {
+                emit(NetworkResult.Error(HttpException(response)))
+            }
+        } catch (e: HttpException) {
+            emit(NetworkResult.Error(e))
+        } catch (e: IOException) {
+            emit(NetworkResult.Error(e))
+        } catch (e: Exception) {
+            emit(NetworkResult.Error(e))
+        }
+    }
+    
+    override suspend fun completePasswordReset(email: String, newPassword: String, code: String): Flow<NetworkResult<Unit>> = flow {
+        emit(NetworkResult.Loading)
+        try {
+            val request = CompletePasswordResetRequest(email, newPassword, code)
+            val response = authApi.completePasswordReset(request)
+            
             if (response.isSuccessful) {
                 emit(NetworkResult.Success(Unit))
             } else {

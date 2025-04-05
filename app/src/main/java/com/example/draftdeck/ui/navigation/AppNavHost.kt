@@ -13,8 +13,11 @@ import androidx.navigation.navArgument
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.auth.AuthViewModel
 import com.example.draftdeck.ui.auth.EmailConfirmationScreen
+import com.example.draftdeck.ui.auth.ForgotPasswordScreen
 import com.example.draftdeck.ui.auth.LoginScreen
+import com.example.draftdeck.ui.auth.PasswordResetCodeVerificationScreen
 import com.example.draftdeck.ui.auth.RegisterScreen
+import com.example.draftdeck.ui.auth.ResetPasswordScreen
 import com.example.draftdeck.ui.auth.WelcomeScreen
 import com.example.draftdeck.ui.dashboard.AdvisorDashboard
 import com.example.draftdeck.ui.dashboard.DashboardViewModel
@@ -90,6 +93,9 @@ fun AppNavHost(
                 onNavigateToEmailVerification = { unverifiedEmail ->
                     // Navigate to email verification screen with the unverified email
                     navController.navigate(Screen.EmailConfirmation.createRoute(unverifiedEmail))
+                },
+                onNavigateToForgotPassword = {
+                    navController.navigate(Screen.ForgotPassword.route)
                 }
             )
         }
@@ -122,6 +128,68 @@ fun AppNavHost(
                     // Navigate to login screen with pre-filled email and success message
                     navController.navigate(Screen.Login.createRoute(email = email, fromVerification = true)) {
                         popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Password reset flow
+        composable(Screen.ForgotPassword.route) {
+            val viewModel: AuthViewModel = hiltViewModel()
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToVerifyCode = { email ->
+                    navController.navigate(Screen.PasswordResetVerification.createRoute(email))
+                }
+            )
+        }
+        
+        composable(
+            route = Screen.PasswordResetVerification.route,
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val viewModel: AuthViewModel = hiltViewModel()
+            val email = backStackEntry.arguments?.getString("email")
+            PasswordResetCodeVerificationScreen(
+                viewModel = viewModel,
+                email = email,
+                onNavigateBack = { navController.popBackStack() },
+                onVerifySuccess = { code ->
+                    val currentEmail = email ?: ""
+                    navController.navigate(Screen.ResetPassword.createRoute(currentEmail, code)) {
+                        popUpTo(Screen.ForgotPassword.route) { inclusive = false }
+                    }
+                }
+            )
+        }
+        
+        composable(
+            route = Screen.ResetPassword.route,
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                },
+                navArgument("code") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val viewModel: AuthViewModel = hiltViewModel()
+            val email = backStackEntry.arguments?.getString("email")
+            val code = backStackEntry.arguments?.getString("code")
+            ResetPasswordScreen(
+                viewModel = viewModel,
+                email = email,
+                code = code,
+                onNavigateBack = { navController.popBackStack() },
+                onResetSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.ForgotPassword.route) { inclusive = true }
                     }
                 }
             )

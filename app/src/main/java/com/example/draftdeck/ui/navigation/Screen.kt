@@ -26,6 +26,13 @@ sealed class Screen(val route: String) {
     object EmailConfirmation : Screen("email_confirmation/{email}") {
         fun createRoute(email: String) = "email_confirmation/$email"
     }
+    object ForgotPassword : Screen("forgot_password")
+    object PasswordResetVerification : Screen("password_reset_verification/{email}") {
+        fun createRoute(email: String) = "password_reset_verification/$email"
+    }
+    object ResetPassword : Screen("reset_password/{email}/{code}") {
+        fun createRoute(email: String, code: String) = "reset_password/$email/$code"
+    }
 
     // Main screens
     object ThesisList : Screen("thesis_list")

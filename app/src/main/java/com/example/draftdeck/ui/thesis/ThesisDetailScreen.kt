@@ -118,6 +118,9 @@ fun ThesisDetailScreen(
                 .padding(paddingValues)
         ) {
             when (val details = thesisDetails) {
+                is NetworkResult.Idle -> {
+                    // Initial state, do nothing
+                }
                 is NetworkResult.Loading -> {
                     LoadingIndicator(fullScreen = true)
                 }

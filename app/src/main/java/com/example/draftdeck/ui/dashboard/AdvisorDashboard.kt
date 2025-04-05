@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 
 import androidx.compose.ui.unit.dp
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.ui.util.handleWhenWithIdle
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.ErrorView
@@ -142,6 +143,9 @@ fun AdvisorDashboard(
             }
 
             when (val result = thesisList) {
+                is NetworkResult.Idle -> {
+                    // Do nothing on idle state
+                }
                 is NetworkResult.Loading -> {
                     LoadingIndicator(fullScreen = true)
                 }

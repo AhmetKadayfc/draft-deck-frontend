@@ -27,6 +27,21 @@ data class ResendVerificationRequest(
     val email: String
 )
 
+data class ResetPasswordRequest(
+    val email: String
+)
+
+data class VerifyPasswordResetCodeRequest(
+    val email: String,
+    val code: String
+)
+
+data class CompletePasswordResetRequest(
+    val email: String,
+    val new_password: String,
+    val code: String
+)
+
 data class AuthResponse(
     val token: String,
     val user: UserDto
@@ -48,6 +63,12 @@ interface AuthApi {
     @POST("auth/resend-verification")
     suspend fun resendVerification(@Body request: ResendVerificationRequest): Response<Unit>
 
-    @POST("auth/reset-password")
-    suspend fun resetPassword(@Body email: String): Response<Unit>
+    @POST("auth/password-reset/request")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<Unit>
+    
+    @POST("auth/password-reset/confirm")
+    suspend fun verifyPasswordResetCode(@Body request: VerifyPasswordResetCodeRequest): Response<Unit>
+    
+    @POST("auth/password-reset/complete")
+    suspend fun completePasswordReset(@Body request: CompletePasswordResetRequest): Response<Unit>
 }

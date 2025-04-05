@@ -117,6 +117,9 @@ fun AddFeedbackScreen(
             ) {
                 // Thesis Information
                 when (val thesisResult = viewModel.thesisDetails.collectAsState().value) {
+                    is NetworkResult.Idle -> {
+                        // Initial state, nothing to display yet
+                    }
                     is NetworkResult.Success -> {
                         val thesis = thesisResult.data
                         Text(

@@ -85,6 +85,9 @@ fun NotificationScreen(
                 .padding(paddingValues)
         ) {
             when (val result = notifications) {
+                is NetworkResult.Idle -> {
+                    // Initial state, do nothing
+                }
                 is NetworkResult.Loading -> {
                     LoadingIndicator(fullScreen = true)
                 }

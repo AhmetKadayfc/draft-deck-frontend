@@ -116,6 +116,9 @@ fun FeedbackDetailScreen(
                 .padding(paddingValues)
         ) {
             when (feedbackList) {
+                is NetworkResult.Idle -> {
+                    // Initial state, do nothing
+                }
                 is NetworkResult.Loading -> {
                     LoadingIndicator(fullScreen = true)
                 }
@@ -237,7 +240,7 @@ fun FeedbackDetailScreen(
                 }
                 is NetworkResult.Error -> {
                     ErrorView(
-                        message = "Failed to load feedback: ${(feedbackList as NetworkResult.Error).exception.message}",
+                        message = "Failed to load feedback: ${(feedback as NetworkResult.Error).exception.message}",
                         onRetry = { /* Reload feedback */ }
                     )
                 }

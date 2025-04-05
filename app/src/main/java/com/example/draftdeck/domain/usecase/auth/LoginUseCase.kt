@@ -12,4 +12,9 @@ class LoginUseCase @Inject constructor(
     suspend operator fun invoke(email: String, password: String): Flow<NetworkResult<User>> {
         return authRepository.login(email, password)
     }
+    
+    // Expose repository for related auth operations
+    fun getRepository(): AuthRepository {
+        return authRepository
+    }
 }

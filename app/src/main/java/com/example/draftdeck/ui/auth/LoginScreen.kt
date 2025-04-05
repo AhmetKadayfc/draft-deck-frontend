@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.data.remote.handle
+import com.example.draftdeck.data.remote.isLoading
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.ErrorView
 import com.example.draftdeck.ui.components.LoadingIndicator
@@ -46,6 +48,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToEmailVerification: (String) -> Unit,
+    onNavigateToForgotPassword: () -> Unit,
     email: String? = null,
     fromVerification: Boolean = false,
     modifier: Modifier = Modifier
@@ -66,13 +69,13 @@ fun LoginScreen(
     val loginState by viewModel.loginState.collectAsState()
 
     LaunchedEffect(loginState) {
-        when (loginState) {
-            is NetworkResult.Success -> {
+        loginState.handle(
+            onSuccess = {
                 onLoginSuccess()
                 viewModel.resetLoginState()
-            }
-            is NetworkResult.Error -> {
-                val error = (loginState as NetworkResult.Error).exception.message ?: "Login failed"
+            },
+            onError = { exception ->
+                val error = exception.message ?: "Login failed"
                 
                 if (error.contains("403", ignoreCase = true)) {
                     val emailToVerify = emailState.takeIf { it.isNotEmpty() } ?: email
@@ -80,16 +83,16 @@ fun LoginScreen(
                     if (!emailToVerify.isNullOrEmpty()) {
                         onNavigateToEmailVerification(emailToVerify)
                         viewModel.resetLoginState()
-                        return@LaunchedEffect
+                        return@handle
                     }
                 }
                 
                 isError = true
                 errorMessage = error
                 showSuccessMessage = false
+                viewModel.resetLoginState()
             }
-            else -> {}
-        }
+        )
     }
 
     Scaffold(
@@ -205,7 +208,7 @@ fun LoginScreen(
                     text = "Password forgotten?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { /* Handle password reset */ }
+                    modifier = Modifier.clickable { onNavigateToForgotPassword() }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -219,7 +222,7 @@ fun LoginScreen(
                 )
             }
 
-            if (loginState is NetworkResult.Loading) {
+            if (loginState.isLoading) {
                 LoadingIndicator(fullScreen = true)
             }
         }

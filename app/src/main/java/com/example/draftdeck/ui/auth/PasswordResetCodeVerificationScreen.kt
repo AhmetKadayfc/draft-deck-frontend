@@ -42,20 +42,19 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.data.remote.handle
 import com.example.draftdeck.data.remote.isLoading
 import com.example.draftdeck.ui.components.DraftDeckAppBar
-import com.example.draftdeck.ui.theme.DraftDeckTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun EmailConfirmationScreen(
+fun PasswordResetCodeVerificationScreen(
     viewModel: AuthViewModel,
-    onConfirmSuccess: () -> Unit,
+    onVerifySuccess: (String) -> Unit,
+    onNavigateBack: () -> Unit,
     email: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -85,8 +84,7 @@ fun EmailConfirmationScreen(
         }
     }
     
-    val verifyEmailState by viewModel.verifyEmailState.collectAsState()
-    val resendVerificationState by viewModel.resendVerificationState.collectAsState()
+    val verifyPasswordResetCodeState by viewModel.verifyPasswordResetCodeState.collectAsState()
     val currentEmail by viewModel.currentEmail.collectAsState()
 
     // Start countdown for resend option
@@ -104,68 +102,42 @@ fun EmailConfirmationScreen(
     }
     
     // Handle verification result
-    LaunchedEffect(verifyEmailState) {
-        verifyEmailState.handle(
+    LaunchedEffect(verifyPasswordResetCodeState) {
+        verifyPasswordResetCodeState.handle(
             onLoading = {
                 // Only set loading to true if we've actually submitted the code
                 if (code.length == 5) {
                     isLoading = true
                 }
             },
-            onSuccess = { user ->
+            onSuccess = {
                 isLoading = false
                 // Show success message before navigating
-                snackbarHostState.showSnackbar("Email verified successfully!")
-                // Navigate to login screen
-                onConfirmSuccess()
-                viewModel.resetVerifyEmailState()
+                snackbarHostState.showSnackbar("Code verified successfully!")
+                // Navigate to password reset screen with the verified code
+                onVerifySuccess(code)
+                viewModel.resetVerifyPasswordResetCodeState()
             },
             onError = { exception ->
                 isLoading = false
                 val errorMessage = exception.message ?: "Verification failed"
                 snackbarHostState.showSnackbar(errorMessage)
-                viewModel.resetVerifyEmailState()
+                viewModel.resetVerifyPasswordResetCodeState()
             }
         )
     }
     
-    // Handle resend verification result
-    LaunchedEffect(resendVerificationState) {
-        resendVerificationState.handle(
-            onLoading = {
-                // Only set loading true if actively resending
-                if (canResend) {
-                    isLoading = true
-                }
-            },
-            onSuccess = {
-                isLoading = false
-                snackbarHostState.showSnackbar("Verification code resent")
-                // Reset the countdown
-                countdown = 60
-                canResend = false
-                viewModel.resetResendVerificationState()
-            },
-            onError = { exception ->
-                isLoading = false
-                val errorMessage = exception.message ?: "Failed to resend code"
-                snackbarHostState.showSnackbar(errorMessage)
-                viewModel.resetResendVerificationState()
-            }
-        )
-    }
-
-    // Remove the unnecessary loading initialization
+    // Remove the unnecessary initialization
     LaunchedEffect(Unit) {
-        viewModel.resetVerifyEmailState()
-        viewModel.resetResendVerificationState()
+        viewModel.resetVerifyPasswordResetCodeState()
     }
 
     Scaffold(
         topBar = {
             DraftDeckAppBar(
-                title = "Email Confirmation",
-                showBackButton = false
+                title = "Verify Code",
+                showBackButton = true,
+                onBackClick = onNavigateBack
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -179,7 +151,7 @@ fun EmailConfirmationScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Email Confirmation",
+                text = "Password Reset Verification",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -187,7 +159,7 @@ fun EmailConfirmationScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "We've sent a 5-digit code to ${currentEmail ?: "your email address"}. Please enter it below to verify your account.",
+                text = "We've sent a 5-digit code to ${currentEmail ?: "your email address"}. Please enter it below to reset your password.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
@@ -205,90 +177,94 @@ fun EmailConfirmationScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                repeat(5) { index ->
-                    val char = code.getOrNull(index)?.toString() ?: ""
+                // Create 5 single-digit input fields for the verification code
+                for (i in 0 until 5) {
+                    val isFilled = code.length > i
+                    val char = if (isFilled) code[i].toString() else ""
+                    val borderColor = if (isFilled) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.outline
 
-                    BasicTextField(
-                        value = char,
-                        onValueChange = { newValue ->
-                            if (newValue.length <= 1) {
-                                // Update the digit at the current position
-                                code = if (newValue.isEmpty()) {
-                                    // Move focus to previous field when deleting
-                                    if (index > 0) {
-                                        scope.launch {
-                                            focusRequesters[index - 1].requestFocus()
-                                        }
-                                    }
-                                    code.replaceRange(maxOf(0, index), minOf(index + 1, code.length), "")
-                                } else {
-                                    val currentCode = if (index >= code.length) code.padEnd(index, ' ') else code
-                                    val updatedCode = currentCode.replaceRange(index, minOf(index + 1, currentCode.length), newValue)
-                                    
-                                    // Move focus to next field when digit is entered
-                                    if (index < 4) {
-                                        scope.launch {
-                                            focusRequesters[index + 1].requestFocus()
-                                        }
-                                    } else {
-                                        // Clear focus when the last digit is entered
-                                        focusManager.clearFocus()
-                                    }
-                                    
-                                    updatedCode
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = KeyboardType.NumberPassword,
-                            imeAction = if (index == 4) ImeAction.Done else ImeAction.Next
-                        ),
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    // Code input box
+                    Box(
                         modifier = Modifier
                             .size(50.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface)
                             .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
+                                width = 1.5.dp,
+                                color = borderColor,
                                 shape = RoundedCornerShape(8.dp)
                             )
-                            .padding(8.dp)
-                            .focusRequester(focusRequesters[index])
-                    )
-
-                    if (index < 4) {
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BasicTextField(
+                            value = char,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty()) {
+                                    // Delete behavior - remove the last digit
+                                    if (code.isNotEmpty()) {
+                                        code = code.substring(0, code.length - 1)
+                                        if (i > 0) {
+                                            focusRequesters[i - 1].requestFocus()
+                                        }
+                                    }
+                                } else {
+                                    // Only accept digits
+                                    val lastChar = newValue.last()
+                                    if (lastChar.isDigit()) {
+                                        if (i < code.length) {
+                                            // Replace the existing digit at this position
+                                            code = code.substring(0, i) + lastChar + code.substring(i + 1)
+                                        } else {
+                                            // Add a new digit
+                                            code += lastChar
+                                        }
+                                        
+                                        // Auto-advance to next field
+                                        if (i < 4) {
+                                            focusRequesters[i + 1].requestFocus()
+                                        } else {
+                                            // Last field, hide keyboard
+                                            focusManager.clearFocus()
+                                        }
+                                    }
+                                }
+                            },
+                            textStyle = MaterialTheme.typography.titleLarge.copy(
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            singleLine = true,
+                            maxLines = 1,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = if (i == 4) ImeAction.Done else ImeAction.Next
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusRequester(focusRequesters[i])
+                        )
+                    }
+                    
+                    if (i < 4) {
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-            
-            // Calculate button enabled state based on code length
-            val isEmailValid = currentEmail != null || email != null
+
             val isCodeComplete = code.length == 5
-            val buttonEnabled = isCodeComplete && !isLoading && isEmailValid
-            
-            // Debug logging for state
-            LaunchedEffect(code) {
-                if (isCodeComplete) {
-                    // Reset state if the user re-enters a complete code
-                    if (verifyEmailState is NetworkResult.Error) {
-                        viewModel.resetVerifyEmailState()
-                    }
-                }
-            }
+            val buttonEnabled = isCodeComplete && !isLoading
 
             Button(
                 onClick = {
-                    // Verify the email with the entered code
-                    viewModel.verifyEmail(code)
+                    // Verify the code
+                    viewModel.verifyPasswordResetCode(code)
                 },
                 modifier = Modifier.fillMaxWidth(0.8f),
                 enabled = buttonEnabled
@@ -300,7 +276,7 @@ fun EmailConfirmationScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Confirm")
+                    Text("Verify")
                 }
             }
 
@@ -311,10 +287,13 @@ fun EmailConfirmationScreen(
                     text = "Didn't receive the code? Resend",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier
+                        .padding(8.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .clickable(enabled = canResend && !isLoading) {
-                            viewModel.resendVerification()
+                            viewModel.requestPasswordReset(currentEmail ?: email ?: "")
+                            countdown = 60
+                            canResend = false
                         }
                 )
             } else {
@@ -326,14 +305,4 @@ fun EmailConfirmationScreen(
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun EmailConfirmationScreenPreview() {
-    // This preview won't work properly due to the view model dependency
-    // but it's useful for layout checks
-    DraftDeckTheme {
-        // EmailConfirmationScreen(viewModel = viewModel, onConfirmSuccess = {})
-    }
-}
+} 

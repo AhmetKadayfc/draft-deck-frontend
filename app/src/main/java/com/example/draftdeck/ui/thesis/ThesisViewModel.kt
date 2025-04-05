@@ -39,10 +39,10 @@ class ThesisViewModel @Inject constructor(
     val currentUser: StateFlow<User?> = getCurrentUserUseCase()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _thesisDetails = MutableStateFlow<NetworkResult<Thesis>>(NetworkResult.Loading)
+    private val _thesisDetails = MutableStateFlow<NetworkResult<Thesis>>(NetworkResult.Idle)
     val thesisDetails: StateFlow<NetworkResult<Thesis>> = _thesisDetails
 
-    private val _feedbackList = MutableStateFlow<NetworkResult<List<Feedback>>>(NetworkResult.Loading)
+    private val _feedbackList = MutableStateFlow<NetworkResult<List<Feedback>>>(NetworkResult.Idle)
     val feedbackList: StateFlow<NetworkResult<List<Feedback>>> = _feedbackList
 
     private val _uploadThesisResult = MutableStateFlow<NetworkResult<Thesis>?>(null)

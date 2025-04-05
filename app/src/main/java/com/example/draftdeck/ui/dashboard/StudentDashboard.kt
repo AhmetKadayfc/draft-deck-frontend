@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.data.remote.handle
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.ErrorView
@@ -159,15 +160,18 @@ fun StudentDashboard(
                 }
             }
 
-            when (val result = thesisList) {
-                is NetworkResult.Loading -> {
+            thesisList.handle(
+                onIdle = {
+                    // Do nothing in initial state
+                },
+                onLoading = {
                     LoadingIndicator(fullScreen = true)
-                }
-                is NetworkResult.Success -> {
+                },
+                onSuccess = { data ->
                     val filteredTheses = if (searchQuery.isBlank()) {
-                        result.data
+                        data
                     } else {
-                        result.data.filter {
+                        data.filter {
                             it.title.contains(searchQuery, ignoreCase = true) ||
                                     it.description.contains(searchQuery, ignoreCase = true)
                         }
@@ -197,14 +201,14 @@ fun StudentDashboard(
                             }
                         }
                     }
-                }
-                is NetworkResult.Error -> {
+                },
+                onError = { exception ->
                     ErrorView(
-                        message = "Failed to load theses: ${result.exception.message}",
+                        message = "Failed to load theses: ${exception.message}",
                         onRetry = { viewModel.refreshThesisList() }
                     )
                 }
-            }
+            )
         }
     }
 }

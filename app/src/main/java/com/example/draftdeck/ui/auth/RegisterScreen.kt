@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.data.remote.handle
+import com.example.draftdeck.data.remote.isLoading
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.LoadingIndicator
@@ -69,17 +71,17 @@ fun RegisterScreen(
     val registerState by viewModel.registerState.collectAsState()
 
     LaunchedEffect(registerState) {
-        when (registerState) {
-            is NetworkResult.Success -> {
+        registerState.handle(
+            onSuccess = {
                 onRegisterSuccess(email)
                 viewModel.resetRegisterState()
-            }
-            is NetworkResult.Error -> {
+            },
+            onError = { exception ->
                 isError = true
-                errorMessage = (registerState as NetworkResult.Error).exception.message ?: "Registration failed"
+                errorMessage = exception.message ?: "Registration failed"
+                viewModel.resetRegisterState()
             }
-            else -> {}
-        }
+        )
     }
 
     Scaffold(
@@ -294,7 +296,7 @@ fun RegisterScreen(
                 )
             }
 
-            if (registerState is NetworkResult.Loading) {
+            if (registerState.isLoading) {
                 LoadingIndicator(fullScreen = true)
             }
         }

@@ -80,8 +80,8 @@ fun ProfileScreen(
     var showChangePasswordDialog by remember { mutableStateOf(false) }
 
     // Form fields
-    var name by remember { mutableStateOf("") }
-    var surname by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
 
     var oldPassword by remember { mutableStateOf("") }
@@ -102,8 +102,8 @@ fun ProfileScreen(
     // Initialize form fields with current user data
     LaunchedEffect(currentUser) {
         currentUser?.let {
-            name = it.name
-            surname = it.surname
+            firstName = it.firstName
+            lastName = it.lastName
             phoneNumber = it.phoneNumber ?: ""
         }
     }
@@ -185,7 +185,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "${user.name} ${user.surname}",
+                        text = "${user.firstName} ${user.lastName}",
                         style = MaterialTheme.typography.headlineMedium
                     )
 
@@ -332,8 +332,8 @@ fun ProfileScreen(
                         text = {
                             Column {
                                 OutlinedTextField(
-                                    value = name,
-                                    onValueChange = { name = it },
+                                    value = firstName,
+                                    onValueChange = { firstName = it },
                                     label = { Text("Name") },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(
@@ -352,8 +352,8 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 OutlinedTextField(
-                                    value = surname,
-                                    onValueChange = { surname = it },
+                                    value = lastName,
+                                    onValueChange = { lastName = it },
                                     label = { Text("Surname") },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(
@@ -394,8 +394,8 @@ fun ProfileScreen(
                             Button(
                                 onClick = {
                                     viewModel.updateProfile(
-                                        name = name,
-                                        surname = surname,
+                                        firstName = firstName,
+                                        lastName = lastName,
                                         phoneNumber = phoneNumber.takeIf { it.isNotBlank() }
                                     )
                                 }

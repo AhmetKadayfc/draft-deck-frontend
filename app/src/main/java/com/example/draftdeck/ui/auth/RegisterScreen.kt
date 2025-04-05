@@ -51,12 +51,12 @@ import com.example.draftdeck.ui.theme.DraftDeckTheme
 @Composable
 fun RegisterScreen(
     viewModel: AuthViewModel,
-    onRegisterSuccess: () -> Unit,
+    onRegisterSuccess: (String) -> Unit,
     onNavigateToLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var name by remember { mutableStateOf("") }
-    var surname by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -71,7 +71,7 @@ fun RegisterScreen(
     LaunchedEffect(registerState) {
         when (registerState) {
             is NetworkResult.Success -> {
-                onRegisterSuccess()
+                onRegisterSuccess(email)
                 viewModel.resetRegisterState()
             }
             is NetworkResult.Error -> {
@@ -107,8 +107,8 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it; isError = false },
+                        value = firstName,
+                        onValueChange = { firstName = it; isError = false },
                         label = { Text("Name") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -128,8 +128,8 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     OutlinedTextField(
-                        value = surname,
-                        onValueChange = { surname = it; isError = false },
+                        value = lastName,
+                        onValueChange = { lastName = it; isError = false },
                         label = { Text("Surname") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -267,7 +267,7 @@ fun RegisterScreen(
 
                 Button(
                     onClick = {
-                        if (name.isBlank() || surname.isBlank() || email.isBlank() ||
+                        if (firstName.isBlank() || lastName.isBlank() || email.isBlank() ||
                             password.isBlank() || confirmPassword.isBlank() || role.isBlank()) {
                             isError = true
                             errorMessage = "Please fill in all fields"
@@ -275,7 +275,7 @@ fun RegisterScreen(
                             isError = true
                             errorMessage = "Passwords do not match"
                         } else {
-                            viewModel.register(email, password, name, surname, role)
+                            viewModel.register(email, password, firstName, lastName, role)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()

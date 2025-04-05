@@ -3,9 +3,29 @@ package com.example.draftdeck.ui.navigation
 sealed class Screen(val route: String) {
     // Auth screens
     object Welcome : Screen("welcome")
-    object Login : Screen("login")
+    object Login : Screen("login?email={email}&fromVerification={fromVerification}") {
+        fun createRoute(email: String? = null, fromVerification: Boolean = false): String {
+            // Only include email param if it's not null or empty
+            val emailParam = if (email.isNullOrEmpty()) {
+                ""
+            } else {
+                "email=$email"
+            }
+            
+            val verificationParam = "fromVerification=$fromVerification"
+            
+            // Create route with proper query params
+            return if (emailParam.isEmpty()) {
+                "login?$verificationParam"
+            } else {
+                "login?$emailParam&$verificationParam"
+            }
+        }
+    }
     object Register : Screen("register")
-    object EmailConfirmation : Screen("email_confirmation")
+    object EmailConfirmation : Screen("email_confirmation/{email}") {
+        fun createRoute(email: String) = "email_confirmation/$email"
+    }
 
     // Main screens
     object ThesisList : Screen("thesis_list")

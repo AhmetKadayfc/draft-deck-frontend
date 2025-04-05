@@ -12,10 +12,10 @@ class RegisterUseCase @Inject constructor(
     suspend operator fun invoke(
         email: String,
         password: String,
-        name: String,
-        surname: String,
+        firstName: String,
+        lastName: String,
         role: String
     ): Flow<NetworkResult<User>> {
-        return authRepository.register(email, password, name, surname, role)
+        return authRepository.register(email, password, firstName, lastName, role)
     }
 }

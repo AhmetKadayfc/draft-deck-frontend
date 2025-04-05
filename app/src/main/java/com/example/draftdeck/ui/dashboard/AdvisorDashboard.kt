@@ -235,8 +235,8 @@ fun AdvisorDashboard(
 //    val sampleUser = User(
 //        id = "a1",
 //        email = "smith@example.com",
-//        name = "John",
-//        surname = "Smith",
+//        firstName = "John",
+//        lastName = "Smith",
 //        role = Constants.ROLE_ADVISOR,
 //        thesisCount = 2
 //    )

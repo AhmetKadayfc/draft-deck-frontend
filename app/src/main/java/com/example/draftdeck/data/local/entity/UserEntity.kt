@@ -9,8 +9,8 @@ data class UserEntity(
     @PrimaryKey
     val id: String,
     val email: String,
-    val name: String,
-    val surname: String,
+    val firstName: String,
+    val lastName: String,
     val role: String,
     val phoneNumber: String?,
     val advisorName: String?,
@@ -22,8 +22,8 @@ fun UserEntity.toUser(): User {
     return User(
         id = id,
         email = email,
-        name = name,
-        surname = surname,
+        firstName = firstName,
+        lastName = lastName,
         role = role,
         phoneNumber = phoneNumber,
         advisorName = advisorName,
@@ -36,8 +36,8 @@ fun User.toUserEntity(): UserEntity {
     return UserEntity(
         id = id,
         email = email,
-        name = name,
-        surname = surname,
+        firstName = firstName,
+        lastName = lastName,
         role = role,
         phoneNumber = phoneNumber,
         advisorName = advisorName,

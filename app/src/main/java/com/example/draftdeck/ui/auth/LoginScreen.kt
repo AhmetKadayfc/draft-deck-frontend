@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,12 +45,22 @@ fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    email: String? = null,
+    fromVerification: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var email by remember { mutableStateOf("") }
+    var emailState by remember { 
+        mutableStateOf(
+            when {
+                email == null || email.isEmpty() || email == "{email}" -> ""
+                else -> email
+            }
+        ) 
+    }
     var password by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var showSuccessMessage by remember { mutableStateOf(fromVerification) }
 
     val loginState by viewModel.loginState.collectAsState()
 
@@ -63,6 +73,7 @@ fun LoginScreen(
             is NetworkResult.Error -> {
                 isError = true
                 errorMessage = (loginState as NetworkResult.Error).exception.message ?: "Login failed"
+                showSuccessMessage = false
             }
             else -> {}
         }
@@ -95,11 +106,23 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (showSuccessMessage) {
+                    Text(
+                        text = "Your email has been successfully verified! Please log in.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it; isError = false },
+                    value = emailState,
+                    onValueChange = { emailState = it; isError = false },
                     label = { Text("Email") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -108,7 +131,7 @@ fun LoginScreen(
                     ),
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Email,
+                            imageVector = Icons.Outlined.Email,
                             contentDescription = "Email"
                         )
                     },
@@ -130,7 +153,7 @@ fun LoginScreen(
                     ),
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Lock,
+                            imageVector = Icons.Outlined.Lock,
                             contentDescription = "Password"
                         )
                     },
@@ -151,26 +174,17 @@ fun LoginScreen(
 
                 Button(
                     onClick = {
-                        if (email.isBlank() || password.isBlank()) {
+                        if (emailState.isBlank() || password.isBlank()) {
                             isError = true
                             errorMessage = "Please fill in all fields"
                         } else {
-                            viewModel.login(email, password)
+                            viewModel.login(emailState, password)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Login")
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Password forgotten?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { /* Handle password reset */ }
-                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 

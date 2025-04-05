@@ -20,7 +20,7 @@ class AddFeedbackUseCase @Inject constructor(
         return feedbackRepository.createFeedback(
             thesisId = thesisId,
             advisorId = currentUser.id,
-            advisorName = "${currentUser.name} ${currentUser.surname}",
+            advisorName = "${currentUser.firstName} ${currentUser.lastName}",
             overallRemarks = overallRemarks,
             inlineComments = inlineComments
         )

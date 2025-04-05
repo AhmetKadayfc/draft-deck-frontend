@@ -13,9 +13,14 @@ data class LoginRequest(
 data class RegisterRequest(
     val email: String,
     val password: String,
-    val name: String,
-    val surname: String,
+    val first_name: String,
+    val last_name: String,
     val role: String
+)
+
+data class VerifyEmailRequest(
+    val email: String,
+    val code: String
 )
 
 data class AuthResponse(
@@ -32,6 +37,12 @@ interface AuthApi {
 
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
+
+    @POST("auth/verify-email")
+    suspend fun verifyEmail(@Body request: VerifyEmailRequest): Response<AuthResponse>
+
+    @POST("auth/resend-verification")
+    suspend fun resendVerification(@Body email: String): Response<Unit>
 
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body email: String): Response<Unit>

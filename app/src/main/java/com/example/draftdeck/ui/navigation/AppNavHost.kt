@@ -56,10 +56,31 @@ fun AppNavHost(
             )
         }
 
-        composable(Screen.Login.route) {
+        composable(
+            route = Screen.Login.route,
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fromVerification") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) {
             val viewModel: AuthViewModel = hiltViewModel()
+            // Get email parameter, ensure it's not empty or the placeholder
+            val email = it.arguments?.getString("email")?.let { email ->
+                if (email.isEmpty() || email == "{email}") null else email
+            }
+            val fromVerification = it.arguments?.getBoolean("fromVerification") ?: false
+            
             LoginScreen(
                 viewModel = viewModel,
+                email = email,
+                fromVerification = fromVerification,
                 onLoginSuccess = {
                     navController.navigate(Screen.ThesisList.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = true }
@@ -73,19 +94,29 @@ fun AppNavHost(
             val viewModel: AuthViewModel = hiltViewModel()
             RegisterScreen(
                 viewModel = viewModel,
-                onRegisterSuccess = {
-                    navController.navigate(Screen.EmailConfirmation.route)
+                onRegisterSuccess = { email ->
+                    navController.navigate(Screen.EmailConfirmation.createRoute(email))
                 },
                 onNavigateToLogin = { navController.navigate(Screen.Login.route) }
             )
         }
 
-        composable(Screen.EmailConfirmation.route) {
+        composable(
+            route = Screen.EmailConfirmation.route,
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
             val viewModel: AuthViewModel = hiltViewModel()
+            val email = backStackEntry.arguments?.getString("email")
             EmailConfirmationScreen(
                 viewModel = viewModel,
+                email = email,
                 onConfirmSuccess = {
-                    navController.navigate(Screen.Login.route) {
+                    // Navigate to login screen with pre-filled email and success message
+                    navController.navigate(Screen.Login.createRoute(email = email, fromVerification = true)) {
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
                 }

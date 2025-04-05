@@ -251,8 +251,8 @@ fun StudentDashboard(
 //    val sampleUser = User(
 //        id = "s1",
 //        email = "john@example.com",
-//        name = "John",
-//        surname = "Doe",
+//        firstName = "John",
+//        lastName = "Doe",
 //        role = Constants.ROLE_STUDENT,
 //        advisorName = "Dr. Smith",
 //        thesisCount = 2

@@ -43,15 +43,15 @@ class ProfileViewModel @Inject constructor(
     private val _updateProfilePictureResult = MutableStateFlow<NetworkResult<User>?>(null)
     val updateProfilePictureResult: StateFlow<NetworkResult<User>?> = _updateProfilePictureResult
 
-    fun updateProfile(name: String, surname: String, phoneNumber: String?) {
+    fun updateProfile(firstName: String, lastName: String, phoneNumber: String?) {
         viewModelScope.launch {
             _updateProfileResult.value = NetworkResult.Loading
 
             try {
                 currentUser.value?.id?.let { userId ->
                     val request = UpdateProfileRequest(
-                        name = name,
-                        surname = surname,
+                        firstName = firstName,
+                        lastName= lastName,
                         phoneNumber = phoneNumber
                     )
 

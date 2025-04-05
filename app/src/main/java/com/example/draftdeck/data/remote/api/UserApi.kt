@@ -12,8 +12,8 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 
 data class UpdateProfileRequest(
-    val name: String,
-    val surname: String,
+    val firstName: String,
+    val lastName: String,
     val phoneNumber: String?
 )
 

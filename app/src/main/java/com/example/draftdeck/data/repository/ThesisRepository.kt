@@ -111,11 +111,15 @@ class ThesisRepositoryImpl @Inject constructor(
             try {
                 Log.d(TAG, "Fetching theses from remote API with query params")
                 
-                // Build query parameters
+                // Build query parameters to match Flask API expectations
                 val queryParams = mutableMapOf<String, String>()
                 status?.let { queryParams["status"] = it }
-                type?.let { queryParams["type"] = it }
+                type?.let { queryParams["type"] = it } // Flask API expects "type" not "thesis_type"
                 query?.let { queryParams["query"] = it }
+                
+                // We can also add limit and offset if needed for pagination
+                queryParams["limit"] = "20"
+                queryParams["offset"] = "0"
                 
                 val response = thesisApi.getTheses(queryParams)
                 Log.d(TAG, "API response received: ${response.code()}")

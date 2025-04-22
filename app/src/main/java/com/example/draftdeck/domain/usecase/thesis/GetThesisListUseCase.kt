@@ -11,8 +11,15 @@ import javax.inject.Inject
 class GetThesisListUseCase @Inject constructor(
     private val thesisRepository: ThesisRepository
 ) {
+    /**
+     * Get thesis list with filters that match the Flask API's expected parameters
+     * @param currentUser User making the request (role handled server-side)
+     * @param status Filter by thesis status
+     * @param type Filter by thesis type (matches "type" parameter in Flask API)
+     * @param query Search query for thesis title/description
+     */
     operator fun invoke(currentUser: User, status: String? = null, type: String? = null, query: String? = null): Flow<NetworkResult<List<Thesis>>> {
-        // Use the new getTheses method which handles role-specific logic server-side
+        // The repository will send these parameters to the API endpoint
         return thesisRepository.getTheses(status, type, query)
     }
 }

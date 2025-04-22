@@ -44,7 +44,10 @@ data class CompletePasswordResetRequest(
 )
 
 data class AuthResponse(
-    val token: String,
+    val access_token: String,
+    val refresh_token: String,
+    val token_type: String,
+    val expires_in: Int,
     val user: UserDto
 )
 

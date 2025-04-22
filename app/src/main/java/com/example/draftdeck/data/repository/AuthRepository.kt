@@ -44,7 +44,12 @@ class AuthRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful) {
                 response.body()?.let { authResponse ->
-                    sessionManager.saveAuthToken(authResponse.token)
+                    sessionManager.saveAuthData(
+                        accessToken = authResponse.access_token,
+                        refreshToken = authResponse.refresh_token,
+                        tokenType = authResponse.token_type,
+                        expiresIn = authResponse.expires_in
+                    )
                     sessionManager.saveUser(authResponse.user.toUser())
                     emit(NetworkResult.Success(authResponse.user.toUser()))
                 } ?: emit(NetworkResult.Error(Exception("Empty response body")))
@@ -75,7 +80,12 @@ class AuthRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful) {
                 response.body()?.let { authResponse ->
-                    sessionManager.saveAuthToken(authResponse.token)
+                    sessionManager.saveAuthData(
+                        accessToken = authResponse.access_token,
+                        refreshToken = authResponse.refresh_token,
+                        tokenType = authResponse.token_type,
+                        expiresIn = authResponse.expires_in
+                    )
                     sessionManager.saveUser(authResponse.user.toUser())
                     emit(NetworkResult.Success(authResponse.user.toUser()))
                 } ?: emit(NetworkResult.Error(Exception("Empty response body")))
@@ -99,7 +109,12 @@ class AuthRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful) {
                 response.body()?.let { authResponse ->
-                    sessionManager.saveAuthToken(authResponse.token)
+                    sessionManager.saveAuthData(
+                        accessToken = authResponse.access_token,
+                        refreshToken = authResponse.refresh_token,
+                        tokenType = authResponse.token_type,
+                        expiresIn = authResponse.expires_in
+                    )
                     sessionManager.saveUser(authResponse.user.toUser())
                     emit(NetworkResult.Success(authResponse.user.toUser()))
                 } ?: emit(NetworkResult.Error(Exception("Empty response body")))

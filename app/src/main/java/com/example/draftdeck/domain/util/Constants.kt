@@ -7,6 +7,9 @@ object Constants {
     // Preferences Keys
     const val PREFERENCES_NAME = "draft_deck_preferences"
     const val KEY_AUTH_TOKEN = "auth_token"
+    const val KEY_REFRESH_TOKEN = "refresh_token"
+    const val KEY_TOKEN_TYPE = "token_type"
+    const val KEY_TOKEN_EXPIRY = "token_expiry"
     const val KEY_USER_ROLE = "user_role"
     const val KEY_USER_ID = "user_id"
     const val KEY_USER_PROFILE = "user_profile"

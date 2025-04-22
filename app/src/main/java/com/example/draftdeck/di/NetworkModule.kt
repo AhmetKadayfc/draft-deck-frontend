@@ -36,33 +36,36 @@ object NetworkModule {
             
             // Skip authentication for login and register requests
             val skipAuth = originalRequest.url.encodedPath.contains("/auth/login") || 
-                           originalRequest.url.encodedPath.contains("/auth/register")
+                           originalRequest.url.encodedPath.contains("/auth/register") ||
+                           originalRequest.url.encodedPath.contains("/auth/password-reset")
             
             if (skipAuth) {
                 Log.d(TAG, "Skipping auth for endpoint: ${originalRequest.url}")
                 return@Interceptor chain.proceed(originalRequest)
             }
             
-            val token = runBlocking { 
-                val authToken = sessionManager.getAuthToken().first()
-                Log.d(TAG, "Auth token: ${if (authToken.isNullOrBlank()) "NULL/EMPTY" else "AVAILABLE"}")
-                authToken
+            // Get the full auth header with token type
+            val authHeader = runBlocking { 
+                val header = sessionManager.getAuthHeader().first()
+                Log.d(TAG, "Auth header: ${if (header.isNullOrBlank()) "NULL/EMPTY" else "AVAILABLE"}")
+                header
             }
 
-            val request = if (!token.isNullOrBlank()) {
-                Log.d(TAG, "Adding auth token to request: ${originalRequest.url}")
+            val request = if (!authHeader.isNullOrBlank()) {
+                Log.d(TAG, "Adding auth header to request: ${originalRequest.url}")
                 originalRequest.newBuilder()
-                    .header("Authorization", "Bearer $token")
+                    .header("Authorization", authHeader)
                     .build()
             } else {
-                Log.w(TAG, "No auth token available for request: ${originalRequest.url}")
+                Log.w(TAG, "No auth header available for request: ${originalRequest.url}")
                 originalRequest
             }
 
             // Log the full request to help debugging
             Log.d(TAG, "Sending request: ${request.method} ${request.url}")
             request.headers.forEach { (name, value) ->
-                Log.d(TAG, "Header: $name = $value")
+                val displayValue = if (name.equals("Authorization", ignoreCase = true)) "Bearer ***" else value
+                Log.d(TAG, "Header: $name = $displayValue")
             }
 
             val response = chain.proceed(request)
@@ -71,13 +74,12 @@ object NetworkModule {
             Log.d(TAG, "Received response: ${response.code} for ${request.url}")
             
             // Check if we got a 401 Unauthorized response
-            if (response.code == 401 || response.code == 403) {
-                Log.e(TAG, "Authentication failed (${response.code}) for request: ${originalRequest.url}")
-                // At this point, you might want to trigger a logout or token refresh
-                // But we need to be careful about infinite loops
+            if (response.code == 401) {
+                Log.e(TAG, "Authentication failed (401) for request: ${originalRequest.url}")
+                // In a production app, you might implement token refresh here
                 
-                // We'll just log it for now and let the calling code handle the error
-                // In a real app, you might want to implement token refresh here
+                // For now, we'll just log the error
+                // Consider implementing refresh token logic here in the future
             }
             
             response

@@ -1,5 +1,6 @@
 package com.example.draftdeck.ui.dashboard
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,10 +32,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.draftdeck.data.model.Thesis
 import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.data.remote.handle
 import com.example.draftdeck.domain.util.Constants
@@ -42,7 +45,13 @@ import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.ErrorView
 import com.example.draftdeck.ui.components.LoadingIndicator
 import com.example.draftdeck.ui.thesis.components.ThesisCard
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+/**
+ * Dashboard screen for student users to view and manage their theses.
+ * Supports status filtering, search, and thesis creation.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDashboard(
@@ -54,28 +63,77 @@ fun StudentDashboard(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val TAG = "StudentDashboardDebug"
+    
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var selectedTabIndex by remember { mutableStateOf(0) }
+    var isInitialLoad by remember { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
 
     val currentUser by viewModel.currentUser.collectAsState()
     val thesisList by viewModel.thesisList.collectAsState()
 
-    val filterTabs = listOf("All", "Pending", "Reviewed", "Approved")
-
-    LaunchedEffect(Unit) {
-        viewModel.loadThesisList()
+    // Debug logging for current state
+    LaunchedEffect(currentUser) {
+        Log.d(TAG, "Current user updated: ${currentUser?.id} - ${currentUser?.role}")
+    }
+    
+    LaunchedEffect(thesisList) {
+        Log.d(TAG, "Thesis list state updated: $thesisList")
+        when (thesisList) {
+            is NetworkResult.Success -> {
+                val data = (thesisList as NetworkResult.Success<List<Thesis>>).data
+                Log.d(TAG, "Successfully received ${data.size} theses")
+                data.forEach { thesis ->
+                    Log.d(TAG, "Thesis: ${thesis.id} - ${thesis.title}")
+                }
+            }
+            is NetworkResult.Error -> {
+                val error = (thesisList as NetworkResult.Error).exception
+                Log.e(TAG, "Error in thesis list: ${error.message}", error)
+            }
+            is NetworkResult.Loading -> {
+                Log.d(TAG, "Thesis list is loading")
+            }
+            is NetworkResult.Idle -> {
+                Log.d(TAG, "Thesis list is idle")
+            }
+        }
     }
 
-    LaunchedEffect(selectedTabIndex) {
-        val status = when (selectedTabIndex) {
-            0 -> null
-            1 -> Constants.STATUS_PENDING
-            2 -> Constants.STATUS_REVIEWED
-            3 -> Constants.STATUS_APPROVED
-            else -> null
+    // Status filter tabs
+    val filterTabs = listOf("All", "Pending", "Reviewed", "Approved")
+
+    // Combined LaunchedEffect to handle loading based on filtering changes
+    // This prevents multiple simultaneous API calls
+    LaunchedEffect(isInitialLoad, selectedTabIndex, searchQuery) {
+        if (isInitialLoad) {
+            // Initial load without filters
+            Log.d(TAG, "Initial load - calling loadThesisList()")
+            viewModel.loadThesisList()
+            isInitialLoad = false
+        } else {
+            // Apply filters
+            val status = when (selectedTabIndex) {
+                0 -> null
+                1 -> Constants.STATUS_PENDING
+                2 -> Constants.STATUS_REVIEWED
+                3 -> Constants.STATUS_APPROVED
+                else -> null
+            }
+            
+            Log.d(TAG, "Applying filters - Tab: ${filterTabs[selectedTabIndex]}, Status: ${status ?: "ALL"}, Query: $searchQuery")
+            
+            // Debounce search input to prevent too many API calls
+            delay(300)
+            
+            // Set all parameters at once and make a single API call
+            viewModel.applyFilters(
+                status = status,
+                query = if (searchQuery.isBlank()) null else searchQuery
+            )
         }
-        viewModel.filterThesisByStatus(status)
     }
 
     Scaffold(
@@ -126,10 +184,15 @@ fun StudentDashboard(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Search bar
             SearchBar(
                 query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                onSearch = { isSearchActive = false },
+                onQueryChange = { 
+                    searchQuery = it
+                },
+                onSearch = { 
+                    isSearchActive = false
+                },
                 active = isSearchActive,
                 onActiveChange = { isSearchActive = it },
                 placeholder = { Text("Search thesis") },
@@ -146,6 +209,7 @@ fun StudentDashboard(
                 // Search suggestions would go here
             }
 
+            // Status filter tabs
             ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 edgePadding = 16.dp,
@@ -160,6 +224,7 @@ fun StudentDashboard(
                 }
             }
 
+            // Thesis list content
             thesisList.handle(
                 onIdle = {
                     // Do nothing in initial state
@@ -168,16 +233,7 @@ fun StudentDashboard(
                     LoadingIndicator(fullScreen = true)
                 },
                 onSuccess = { data ->
-                    val filteredTheses = if (searchQuery.isBlank()) {
-                        data
-                    } else {
-                        data.filter {
-                            it.title.contains(searchQuery, ignoreCase = true) ||
-                                    it.description.contains(searchQuery, ignoreCase = true)
-                        }
-                    }
-
-                    if (filteredTheses.isEmpty()) {
+                    if (data.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -193,7 +249,7 @@ fun StudentDashboard(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            items(filteredTheses) { thesis ->
+                            items(data) { thesis ->
                                 ThesisCard(
                                     thesis = thesis,
                                     onClick = { onNavigateToThesisDetail(thesis.id) }

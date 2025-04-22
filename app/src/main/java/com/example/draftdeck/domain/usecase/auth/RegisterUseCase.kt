@@ -14,8 +14,9 @@ class RegisterUseCase @Inject constructor(
         password: String,
         firstName: String,
         lastName: String,
-        role: String
+        role: String,
+        studentId: String? = null
     ): Flow<NetworkResult<User>> {
-        return authRepository.register(email, password, firstName, lastName, role)
+        return authRepository.register(email, password, firstName, lastName, role, studentId)
     }
 }

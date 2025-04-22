@@ -97,6 +97,15 @@ class AuthViewModel @Inject constructor(
         }
     }
     
+    fun register(email: String, password: String, firstName: String, lastName: String, role: String, studentId: String?) {
+        _currentEmail.value = email
+        viewModelScope.launch {
+            registerUseCase(email, password, firstName, lastName, role, studentId).collectLatest { result ->
+                _registerState.value = result
+            }
+        }
+    }
+    
     fun verifyEmail(code: String) {
         val email = _currentEmail.value ?: return
         viewModelScope.launch {
@@ -187,7 +196,24 @@ class AuthViewModel @Inject constructor(
         _verifyPasswordResetCodeState.value = NetworkResult.Idle
     }
     
-    fun resetResetPasswordState() {
+    fun resetPasswordResetState() {
         _resetPasswordState.value = NetworkResult.Idle
+    }
+    
+    /**
+     * Check if the user is authenticated and token is valid
+     * This can be called when entering screens that require authentication
+     * @return true if authenticated, false otherwise
+     */
+    fun checkAuthState(): Boolean {
+        // Simply check if we have a current user
+        val isAuthenticated = currentUser.value != null
+        
+        if (!isAuthenticated) {
+            // Log or notify that user is not authenticated
+            // In a real app, you might want to auto-redirect to login
+        }
+        
+        return isAuthenticated
     }
 }

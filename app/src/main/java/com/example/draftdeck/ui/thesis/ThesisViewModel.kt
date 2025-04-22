@@ -154,4 +154,28 @@ class ThesisViewModel @Inject constructor(
     fun resetDownloadResult() {
         _downloadThesisResult.value = null
     }
+
+    /**
+     * Check if the user is properly authenticated before performing thesis operations
+     * Logs the authentication state for debugging
+     * @return true if authenticated, false otherwise
+     */
+    fun checkAuthentication(): Boolean {
+        val isAuthenticated = currentUser.value != null
+        if (!isAuthenticated) {
+            // Log for debugging
+            android.util.Log.w("ThesisViewModel", "User is not authenticated")
+        } else {
+            android.util.Log.d("ThesisViewModel", "User is authenticated: ${currentUser.value?.email}")
+        }
+        return isAuthenticated
+    }
+
+    /**
+     * A more robust check that can be called before critical operations
+     * that require the current user
+     */
+    fun validateSession(): User? {
+        return currentUser.value
+    }
 }

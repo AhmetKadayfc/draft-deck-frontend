@@ -26,7 +26,8 @@ fun FilePickerButton(
     onFileSelected: (Uri) -> Unit,
     modifier: Modifier = Modifier,
     buttonText: String = "Select File",
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    mimeTypes: String = "application/*"
 ) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -38,7 +39,7 @@ fun FilePickerButton(
     )
 
     Button(
-        onClick = { launcher.launch("application/*") },
+        onClick = { launcher.launch(mimeTypes) },
         modifier = modifier,
         contentPadding = contentPadding,
         colors = ButtonDefaults.buttonColors(

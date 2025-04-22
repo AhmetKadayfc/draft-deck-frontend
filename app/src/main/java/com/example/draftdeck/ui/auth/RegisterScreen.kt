@@ -63,6 +63,7 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("") }
+    var studentId by remember { mutableStateOf("") }
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
     var isError by remember { mutableStateOf(false) }
@@ -249,11 +250,30 @@ fun RegisterScreen(
                             text = { Text("Advisor") },
                             onClick = {
                                 role = Constants.ROLE_ADVISOR
+                                studentId = "" // Clear studentId when Advisor role is selected
                                 isDropdownExpanded = false
                                 isError = false
                             }
                         )
                     }
+                }
+
+                // Student ID Field - Only show if Student role is selected
+                if (role == Constants.ROLE_STUDENT) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedTextField(
+                        value = studentId,
+                        onValueChange = { studentId = it; isError = false },
+                        label = { Text("Student ID") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Done
+                        ),
+                        isError = isError,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 if (isError) {
@@ -273,11 +293,16 @@ fun RegisterScreen(
                             password.isBlank() || confirmPassword.isBlank() || role.isBlank()) {
                             isError = true
                             errorMessage = "Please fill in all fields"
+                        } else if (role == Constants.ROLE_STUDENT && studentId.isBlank()) {
+                            isError = true
+                            errorMessage = "Student ID is required for student registration"
                         } else if (password != confirmPassword) {
                             isError = true
                             errorMessage = "Passwords do not match"
                         } else {
-                            viewModel.register(email, password, firstName, lastName, role)
+                            // Use the studentId parameter only if the role is Student
+                            val studentIdParam = if (role == Constants.ROLE_STUDENT) studentId else null
+                            viewModel.register(email, password, firstName, lastName, role, studentIdParam)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()

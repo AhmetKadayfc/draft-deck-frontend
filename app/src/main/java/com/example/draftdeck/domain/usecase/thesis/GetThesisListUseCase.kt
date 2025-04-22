@@ -11,12 +11,8 @@ import javax.inject.Inject
 class GetThesisListUseCase @Inject constructor(
     private val thesisRepository: ThesisRepository
 ) {
-    operator fun invoke(currentUser: User): Flow<NetworkResult<List<Thesis>>> {
-        return when (currentUser.role) {
-            Constants.ROLE_STUDENT -> thesisRepository.getThesesByStudentId(currentUser.id)
-            Constants.ROLE_ADVISOR -> thesisRepository.getThesesByAdvisorId(currentUser.id)
-            Constants.ROLE_ADMIN -> thesisRepository.getAllTheses()
-            else -> thesisRepository.getAllTheses()
-        }
+    operator fun invoke(currentUser: User, status: String? = null, type: String? = null, query: String? = null): Flow<NetworkResult<List<Thesis>>> {
+        // Use the new getTheses method which handles role-specific logic server-side
+        return thesisRepository.getTheses(status, type, query)
     }
 }

@@ -1,8 +1,10 @@
 package com.example.draftdeck.data.remote.api
 
 import com.example.draftdeck.data.remote.dto.ThesisDto
+import com.example.draftdeck.data.remote.dto.ThesisResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -12,17 +14,12 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
-import retrofit2.http.Query
+import retrofit2.http.QueryMap
 
 interface ThesisApi {
+    // Main endpoint that uses the server's role-based approach
     @GET("theses")
-    suspend fun getAllTheses(): Response<List<ThesisDto>>
-
-    @GET("theses/student/{studentId}")
-    suspend fun getThesesByStudentId(@Path("studentId") studentId: String): Response<List<ThesisDto>>
-
-    @GET("theses/advisor/{advisorId}")
-    suspend fun getThesesByAdvisorId(@Path("advisorId") advisorId: String): Response<List<ThesisDto>>
+    suspend fun getTheses(@QueryMap queryParams: Map<String, String> = emptyMap()): Response<ThesisResponse>
 
     @GET("theses/{thesisId}")
     suspend fun getThesisById(@Path("thesisId") thesisId: String): Response<ThesisDto>
@@ -58,5 +55,5 @@ interface ThesisApi {
     suspend fun deleteThesis(@Path("thesisId") thesisId: String): Response<Unit>
 
     @GET("theses/download/{thesisId}")
-    suspend fun downloadThesis(@Path("thesisId") thesisId: String): Response<okhttp3.ResponseBody>
+    suspend fun downloadThesis(@Path("thesisId") thesisId: String): Response<ResponseBody>
 }

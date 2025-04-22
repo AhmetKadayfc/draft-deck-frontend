@@ -87,7 +87,7 @@ fun ResetPasswordScreen(
             onSuccess = {
                 isLoading = false
                 snackbarHostState.showSnackbar("Password reset successfully")
-                viewModel.resetResetPasswordState()
+                viewModel.resetPasswordResetState()
                 onResetSuccess()
             },
             onError = { exception ->
@@ -96,7 +96,7 @@ fun ResetPasswordScreen(
                 isError = true
                 errorMessage = error
                 snackbarHostState.showSnackbar(error)
-                viewModel.resetResetPasswordState()
+                viewModel.resetPasswordResetState()
             }
         )
     }

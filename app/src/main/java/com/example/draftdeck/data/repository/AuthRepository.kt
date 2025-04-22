@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 interface AuthRepository {
     suspend fun login(email: String, password: String): Flow<NetworkResult<User>>
-    suspend fun register(email: String, password: String, firstName: String, lastName: String, role: String): Flow<NetworkResult<User>>
+    suspend fun register(email: String, password: String, firstName: String, lastName: String, role: String, studentId: String? = null): Flow<NetworkResult<User>>
     suspend fun logout(): Flow<NetworkResult<Unit>>
     suspend fun resetPassword(email: String): Flow<NetworkResult<Unit>>
     suspend fun verifyEmail(email: String, code: String): Flow<NetworkResult<User>>
@@ -65,11 +65,12 @@ class AuthRepositoryImpl @Inject constructor(
         password: String,
         firstName: String,
         lastName: String,
-        role: String
+        role: String,
+        studentId: String?
     ): Flow<NetworkResult<User>> = flow {
         emit(NetworkResult.Loading)
         try {
-            val request = RegisterRequest(email, password, firstName, lastName, role)
+            val request = RegisterRequest(email, password, firstName, lastName, role, studentId)
             val response = authApi.register(request)
 
             if (response.isSuccessful) {

@@ -43,7 +43,6 @@ import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.FilePickerButton
 import com.example.draftdeck.ui.components.LoadingIndicator
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +96,8 @@ fun UploadThesisScreen(
                 viewModel.resetUploadResult()
             }
             onUploadSuccess(thesis.id)
+        } else if (result is NetworkResult.Error) {
+            // Error will be handled in the UI
         }
     }
 
@@ -219,10 +220,18 @@ fun UploadThesisScreen(
                 ) {
                     FilePickerButton(
                         onFileSelected = { uri ->
-                            filePicker.launch("application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                            selectedFileUri = uri
+                            // Get the file name from the Uri
+                            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                if (cursor.moveToFirst() && nameIndex >= 0) {
+                                    selectedFileName = cursor.getString(nameIndex)
+                                }
+                            }
                         },
                         buttonText = if (isUpdate) "Replace File" else "Select Thesis File",
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        mimeTypes = "*/*"
                     )
 
                     Spacer(modifier = Modifier.weight(0.2f))
@@ -299,6 +308,54 @@ fun UploadThesisScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     LoadingIndicator()
+                }
+            }
+            
+            // Error display
+            if ((isUpdate && updateResult is NetworkResult.Error) ||
+                (!isUpdate && uploadResult is NetworkResult.Error)) {
+                
+                val error = if (isUpdate) 
+                    (updateResult as NetworkResult.Error).exception
+                else 
+                    (uploadResult as NetworkResult.Error).exception
+                
+                val isAuthError = error.message?.contains("authentication", ignoreCase = true) == true ||
+                    error.message?.contains("authenticated", ignoreCase = true) == true ||
+                    error.message?.contains("401", ignoreCase = true) == true ||
+                    error.message?.contains("403", ignoreCase = true) == true
+                
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = if (isAuthError) "Authentication Error" else error.message ?: "An error occurred",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = if (isAuthError) 
+                                   "There was a problem with your authentication. Try going back and returning to this screen."
+                                   else "Please try again or contact support if the problem persists.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Button(
+                            onClick = onBackClick
+                        ) {
+                            Text("Go Back")
+                        }
+                    }
                 }
             }
         }

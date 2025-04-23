@@ -130,6 +130,7 @@ fun FeedbackDetailScreen(
                         )
                     } else {
                         val isAdvisor = currentUser?.id == feedback.advisorId
+                        val isAdmin = currentUser?.role == Constants.ROLE_ADMIN
 
                         Column(
                             modifier = Modifier
@@ -222,7 +223,7 @@ fun FeedbackDetailScreen(
                             Spacer(modifier = Modifier.height(24.dp))
 
                             // Actions based on user role
-                            if (isAdvisor) {
+                            if (isAdvisor && !isAdmin) {
                                 Button(
                                     onClick = { onNavigateToUpdateFeedback(feedbackId) },
                                     modifier = Modifier.fillMaxWidth()

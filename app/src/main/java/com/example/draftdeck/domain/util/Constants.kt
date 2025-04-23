@@ -31,4 +31,12 @@ object Constants {
     const val STATUS_REVIEWED = "reviewed"
     const val STATUS_APPROVED = "approved"
     const val STATUS_REJECTED = "rejected"
+    
+    // Thesis Types - MUST be lowercase to match API expectations
+    const val THESIS_TYPE_DRAFT = "draft"
+    const val THESIS_TYPE_FINAL = "final"
+    
+    // Display-friendly thesis types (for UI)
+    const val THESIS_TYPE_DRAFT_DISPLAY = "Draft"
+    const val THESIS_TYPE_FINAL_DISPLAY = "Final"
 }

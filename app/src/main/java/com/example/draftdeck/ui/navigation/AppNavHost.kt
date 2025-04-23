@@ -34,6 +34,10 @@ import com.example.draftdeck.ui.profile.ProfileViewModel
 import com.example.draftdeck.ui.thesis.ThesisDetailScreen
 import com.example.draftdeck.ui.thesis.ThesisViewModel
 import com.example.draftdeck.ui.thesis.UploadThesisScreen
+import com.example.draftdeck.ui.admin.AdminViewModel
+import com.example.draftdeck.ui.admin.UserManagementScreen
+import com.example.draftdeck.ui.admin.AssignAdvisorScreen
+import com.example.draftdeck.ui.admin.StudentThesesScreen
 
 @Composable
 fun AppNavHost(
@@ -224,7 +228,31 @@ fun AppNavHost(
                     }
                 )
             }
-             else {
+            else if (currentUser?.role == Constants.ROLE_ADMIN) {
+                AdvisorDashboard(
+                    viewModel = viewModel,
+                    isAdmin = true,
+                    onNavigateToThesisDetail = { thesisId ->
+                        navController.navigate(Screen.ThesisDetail.createRoute(thesisId))
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route)
+                    },
+                    onNavigateToUserManagement = {
+                        navController.navigate(Screen.UserManagement.route)
+                    },
+                    onLogout = {
+                        authViewModel.logout()
+                        navController.navigate(Screen.Welcome.route) {
+                            popUpTo(Screen.ThesisList.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            else {
                 AdvisorDashboard(
                     viewModel = viewModel,
                     onNavigateToThesisDetail = { thesisId ->
@@ -272,13 +300,10 @@ fun AppNavHost(
         }
 
         composable(Screen.UploadThesis.route) {
-            val viewModel: ThesisViewModel = hiltViewModel()
-
             UploadThesisScreen(
-                viewModel = viewModel,
                 onBackClick = { navController.popBackStack() },
-                onUploadSuccess = { thesisId ->
-                    navController.navigate(Screen.ThesisDetail.createRoute(thesisId)) {
+                onSuccessNavigate = {
+                    navController.navigate(Screen.ThesisList.route) {
                         popUpTo(Screen.ThesisList.route)
                     }
                 }
@@ -292,15 +317,12 @@ fun AppNavHost(
             )
         ) { backStackEntry ->
             val thesisId = backStackEntry.arguments?.getString("thesisId") ?: ""
-            val viewModel: ThesisViewModel = hiltViewModel()
 
             UploadThesisScreen(
-                viewModel = viewModel,
                 thesisId = thesisId,
-                isUpdate = true,
                 onBackClick = { navController.popBackStack() },
-                onUploadSuccess = { updatedThesisId ->
-                    navController.navigate(Screen.ThesisDetail.createRoute(updatedThesisId)) {
+                onSuccessNavigate = {
+                    navController.navigate(Screen.ThesisDetail.createRoute(thesisId)) {
                         popUpTo(Screen.ThesisDetail.createRoute(thesisId)) { inclusive = true }
                     }
                 }
@@ -323,6 +345,9 @@ fun AppNavHost(
                 onBackClick = { navController.popBackStack() },
                 onNavigateToFeedbackDetail = { feedbackId ->
                     navController.navigate(Screen.FeedbackDetail.createRoute(feedbackId))
+                },
+                onNavigateToAddFeedback = { feedbackThesisId ->
+                    navController.navigate(Screen.AddFeedback.createRoute(feedbackThesisId))
                 }
             )
         }
@@ -397,6 +422,60 @@ fun AppNavHost(
                         "StatusUpdate", "Reminder" -> navController.navigate(Screen.ThesisDetail.createRoute(itemId))
                         else -> navController.popBackStack()
                     }
+                }
+            )
+        }
+
+        // Admin screens
+        composable(Screen.UserManagement.route) {
+            val viewModel: AdminViewModel = hiltViewModel()
+
+            UserManagementScreen(
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onViewStudentTheses = { studentId ->
+                    navController.navigate(Screen.StudentThesesList.createRoute(studentId))
+                }
+            )
+        }
+        
+        composable(
+            route = Screen.StudentThesesList.route,
+            arguments = listOf(
+                navArgument("studentId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val studentId = backStackEntry.arguments?.getString("studentId") ?: ""
+            val viewModel: AdminViewModel = hiltViewModel()
+
+            StudentThesesScreen(
+                studentId = studentId,
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onAssignAdvisor = { thesisId ->
+                    navController.navigate(Screen.AssignAdvisor.createRoute(thesisId))
+                },
+                onNavigateToThesisDetail = { thesisId ->
+                    navController.navigate(Screen.ThesisDetail.createRoute(thesisId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.AssignAdvisor.route,
+            arguments = listOf(
+                navArgument("thesisId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val thesisId = backStackEntry.arguments?.getString("thesisId") ?: ""
+            val viewModel: AdminViewModel = hiltViewModel()
+
+            AssignAdvisorScreen(
+                thesisId = thesisId,
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() },
+                onAssignSuccess = {
+                    navController.popBackStack()
                 }
             )
         }

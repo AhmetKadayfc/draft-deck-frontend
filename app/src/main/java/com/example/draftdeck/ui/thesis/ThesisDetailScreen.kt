@@ -128,6 +128,7 @@ fun ThesisDetailScreen(
                     val thesis = details.data
                     val isStudent = currentUser?.role == Constants.ROLE_STUDENT
                     val isAdvisor = currentUser?.role == Constants.ROLE_ADVISOR
+                    val isAdmin = currentUser?.role == Constants.ROLE_ADMIN
                     val isOwner = currentUser?.id == thesis.studentId
 
                     Column(
@@ -316,7 +317,7 @@ fun ThesisDetailScreen(
                         }
 
                         // Advisor actions
-                        if (isAdvisor) {
+                        if (isAdvisor && !isAdmin) {
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Button(

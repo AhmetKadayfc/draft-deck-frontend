@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,7 +35,9 @@ fun ThesisCard(
     thesis: Thesis,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showStudentName: Boolean = false
+    showStudentName: Boolean = false,
+    showAssignButton: Boolean = false,
+    onAssignButtonClick: (() -> Unit)? = null
 ) {
     Card(
         modifier = modifier
@@ -103,6 +107,33 @@ fun ThesisCard(
                     text = "Student: ${thesis.studentName}",
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+            
+            // Advisor info and assign button
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Advisor: ${thesis.advisorName ?: "None assigned"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                if (showAssignButton && onAssignButtonClick != null) {
+                    TextButton(
+                        onClick = onAssignButtonClick
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Assign Advisor"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Assign")
+                    }
+                }
             }
         }
     }

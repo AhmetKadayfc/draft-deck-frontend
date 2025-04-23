@@ -15,12 +15,13 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +51,8 @@ fun AdvisorDashboard(
     onNavigateToProfile: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onLogout: () -> Unit,
+    isAdmin: Boolean = false,
+    onNavigateToUserManagement: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -79,7 +82,7 @@ fun AdvisorDashboard(
     Scaffold(
         topBar = {
             DraftDeckAppBar(
-                title = "Thesis",
+                title = if (isAdmin) "Admin Dashboard" else "Advisor Dashboard",
                 actions = {
                     IconButton(onClick = onNavigateToNotifications) {
                         Icon(
@@ -101,6 +104,22 @@ fun AdvisorDashboard(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (isAdmin && onNavigateToUserManagement != null) {
+                ExtendedFloatingActionButton(
+                    onClick = onNavigateToUserManagement,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Manage Users"
+                        )
+                    },
+                    text = { Text("Manage Users") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     ) { paddingValues ->
         Column(

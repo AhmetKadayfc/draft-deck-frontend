@@ -10,6 +10,7 @@ import com.example.draftdeck.data.model.User
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -138,6 +139,17 @@ class SessionManager @Inject constructor(
             preferences.remove(TOKEN_TYPE)
             preferences.remove(TOKEN_EXPIRY)
             preferences.remove(USER)
+        }
+    }
+    
+    /**
+     * Updates the current user data in storage if the provided user matches the current user's ID
+     * Used when user profile is updated to keep session data in sync
+     */
+    suspend fun updateCurrentUserIfMatches(updatedUser: User) {
+        val currentUser = getUserFlow().first()
+        if (currentUser != null && currentUser.id == updatedUser.id) {
+            saveUser(updatedUser)
         }
     }
 }

@@ -45,6 +45,7 @@ fun FeedbackScreen(
     viewModel: FeedbackViewModel,
     onBackClick: () -> Unit,
     onNavigateToFeedbackDetail: (String) -> Unit,
+    onNavigateToAddFeedback: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -91,7 +92,7 @@ fun FeedbackScreen(
         floatingActionButton = {
             if (currentUser?.role == Constants.ROLE_ADVISOR) {
                 ExtendedFloatingActionButton(
-                    onClick = { /* Navigate to add feedback */ },
+                    onClick = { onNavigateToAddFeedback(thesisId) },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -135,9 +136,11 @@ fun FeedbackScreen(
 
                             Text(
                                 text = if (currentUser?.role == Constants.ROLE_ADVISOR) {
-                                    "Click the button below to add feedback"
+                                    "Your feedback on this thesis"
+                                } else if (currentUser?.role == Constants.ROLE_ADMIN) {
+                                    "Feedback for this thesis"
                                 } else {
-                                    "Your advisor has not added any feedback yet"
+                                    "Feedback from your advisor"
                                 },
                                 style = MaterialTheme.typography.bodyLarge,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

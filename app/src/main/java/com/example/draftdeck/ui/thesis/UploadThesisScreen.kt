@@ -1,8 +1,10 @@
 package com.example.draftdeck.ui.thesis
 
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,7 +41,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.draftdeck.data.model.Thesis
+import com.example.draftdeck.data.model.User
 import com.example.draftdeck.data.remote.NetworkResult
+import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.FilePickerButton
 import com.example.draftdeck.ui.components.LoadingIndicator
@@ -47,57 +53,64 @@ import com.example.draftdeck.ui.components.LoadingIndicator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UploadThesisScreen(
-    viewModel: ThesisViewModel,
-    onBackClick: () -> Unit,
-    onUploadSuccess: (String) -> Unit,
-    modifier: Modifier = Modifier,
     thesisId: String? = null,
-    isUpdate: Boolean = false
+    onBackClick: () -> Unit,
+    onSuccessNavigate: () -> Unit,
+    viewModel: ThesisViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val currentUser by viewModel.currentUser.collectAsState()
-    val thesisDetails by viewModel.thesisDetails.collectAsState()
     val uploadResult by viewModel.uploadThesisResult.collectAsState()
     val updateResult by viewModel.updateThesisResult.collectAsState()
-
+    
+    val thesisDetails by viewModel.thesisDetails.collectAsState()
+    
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var submissionType by remember { mutableStateOf("Draft") } // Default to Draft
+    var submissionType by remember { mutableStateOf(Constants.THESIS_TYPE_DRAFT_DISPLAY) } // Default to Draft
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
-
-    // For updates, load existing thesis details
+    
+    // Flag to determine if we're updating an existing thesis
+    val isUpdate = thesisId != null
+    
+    // Check authentication
+    LaunchedEffect(Unit) {
+        if (!viewModel.checkAuthentication()) {
+            // Should be handled by auth interceptor, but add this as a fallback
+            onBackClick()
+        }
+    }
+    
+    // If we're editing an existing thesis, load its details
     LaunchedEffect(thesisId) {
         if (isUpdate && thesisId != null) {
             viewModel.loadThesisDetails(thesisId)
         }
     }
-
-    // Populate fields with existing thesis data when updating
+    
+    // When thesis details are loaded, update the form
     LaunchedEffect(thesisDetails) {
         if (isUpdate && thesisDetails is NetworkResult.Success) {
-            val thesis = (thesisDetails as NetworkResult.Success).data
+            val thesis = (thesisDetails as NetworkResult.Success<Thesis>).data
             title = thesis.title
             description = thesis.description
             submissionType = thesis.submissionType
         }
     }
-
-    // Handle upload/update success
+    
+    // Handle successful upload/update
     LaunchedEffect(uploadResult, updateResult) {
-        val result = if (isUpdate) updateResult else uploadResult
-
-        if (result is NetworkResult.Success) {
-            val thesis = result.data
-            if (isUpdate) {
-                viewModel.resetUpdateResult()
-            } else {
+        when {
+            uploadResult is NetworkResult.Success -> {
                 viewModel.resetUploadResult()
+                onSuccessNavigate()
             }
-            onUploadSuccess(thesis.id)
-        } else if (result is NetworkResult.Error) {
-            // Error will be handled in the UI
+            updateResult is NetworkResult.Success -> {
+                viewModel.resetUpdateResult()
+                onSuccessNavigate()
+            }
         }
     }
 
@@ -127,46 +140,33 @@ fun UploadThesisScreen(
         }
     ) { paddingValues ->
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.Start
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Thesis Title") },
-                    placeholder = { Text("Enter thesis title") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Next
-                    ),
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = "Title"
-                        )
-                    },
+                    isError = title.isBlank(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
-                    placeholder = { Text("Describe your thesis") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Next
-                    ),
-                    minLines = 3,
+                    isError = description.isBlank(),
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -196,16 +196,16 @@ fun UploadThesisScreen(
                         onDismissRequest = { isDropdownExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Draft") },
+                            text = { Text(Constants.THESIS_TYPE_DRAFT_DISPLAY) },
                             onClick = {
-                                submissionType = "Draft"
+                                submissionType = Constants.THESIS_TYPE_DRAFT_DISPLAY
                                 isDropdownExpanded = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Final") },
+                            text = { Text(Constants.THESIS_TYPE_FINAL_DISPLAY) },
                             onClick = {
-                                submissionType = "Final"
+                                submissionType = Constants.THESIS_TYPE_FINAL_DISPLAY
                                 isDropdownExpanded = false
                             }
                         )

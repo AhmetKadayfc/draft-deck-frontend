@@ -15,6 +15,7 @@ import com.example.draftdeck.domain.usecase.thesis.GetThesisDetailsUseCase
 import com.example.draftdeck.domain.usecase.thesis.UpdateThesisStatusUseCase
 import com.example.draftdeck.domain.usecase.thesis.UpdateThesisUseCase
 import com.example.draftdeck.domain.usecase.thesis.UploadThesisUseCase
+import com.example.draftdeck.domain.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -81,13 +82,20 @@ class ThesisViewModel @Inject constructor(
         viewModelScope.launch {
             _uploadThesisResult.value = NetworkResult.Loading
 
+            // Convert display-friendly submission type to API-compatible value
+            val apiSubmissionType = when (submissionType) {
+                Constants.THESIS_TYPE_DRAFT_DISPLAY -> Constants.THESIS_TYPE_DRAFT
+                Constants.THESIS_TYPE_FINAL_DISPLAY -> Constants.THESIS_TYPE_FINAL
+                else -> submissionType.lowercase() // Fallback
+            }
+
             currentUser.value?.let { user ->
                 uploadThesisUseCase(
                     context = context,
                     title = title,
                     description = description,
                     fileUri = fileUri,
-                    submissionType = submissionType,
+                    submissionType = apiSubmissionType,
                     currentUser = user,
                     advisorId = advisorId
                 ).collectLatest { result ->
@@ -110,12 +118,19 @@ class ThesisViewModel @Inject constructor(
         viewModelScope.launch {
             _updateThesisResult.value = NetworkResult.Loading
 
+            // Convert display-friendly submission type to API-compatible value
+            val apiSubmissionType = when (submissionType) {
+                Constants.THESIS_TYPE_DRAFT_DISPLAY -> Constants.THESIS_TYPE_DRAFT
+                Constants.THESIS_TYPE_FINAL_DISPLAY -> Constants.THESIS_TYPE_FINAL
+                else -> submissionType.lowercase() // Fallback
+            }
+
             updateThesisUseCase(
                 context = context,
                 thesisId = thesisId,
                 title = title,
                 description = description,
-                submissionType = submissionType,
+                submissionType = apiSubmissionType,
                 fileUri = fileUri
             ).collectLatest { result ->
                 _updateThesisResult.value = result

@@ -13,5 +13,5 @@ data class User(
     val phoneNumber: String? = null,
     val advisorName: String? = null,
     val thesisCount: Int = 0,
-    val profilePictureUrl: String? = null,
+    val profilePictureUrl: String? = null
 ) : Parcelable

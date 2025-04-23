@@ -6,6 +6,8 @@ import com.example.draftdeck.data.repository.FeedbackRepository
 import com.example.draftdeck.data.repository.FeedbackRepositoryImpl
 import com.example.draftdeck.data.repository.ThesisRepository
 import com.example.draftdeck.data.repository.ThesisRepositoryImpl
+import com.example.draftdeck.data.repository.UserRepository
+import com.example.draftdeck.data.repository.UserRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -21,6 +23,12 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         authRepositoryImpl: AuthRepositoryImpl
     ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUserRepository(
+        userRepositoryImpl: UserRepositoryImpl
+    ): UserRepository
 
     @Binds
     @Singleton

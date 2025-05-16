@@ -1,6 +1,7 @@
 package com.example.draftdeck.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.example.draftdeck.data.local.dao.FeedbackDao
 import com.example.draftdeck.data.local.entity.FeedbackEntity
 import com.example.draftdeck.data.local.entity.InlineCommentEntity
@@ -13,9 +14,11 @@ import com.example.draftdeck.data.remote.api.FeedbackApi
 import com.example.draftdeck.data.remote.api.InlineCommentRequest
 import com.example.draftdeck.data.remote.dto.toFeedback
 import com.example.draftdeck.domain.util.FileHelper
+import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
@@ -27,8 +30,6 @@ interface FeedbackRepository {
     fun getFeedbackById(feedbackId: String): Flow<NetworkResult<Feedback>>
     suspend fun createFeedback(
         thesisId: String,
-        advisorId: String,
-        advisorName: String,
         overallRemarks: String,
         inlineComments: List<InlineComment>
     ): Flow<NetworkResult<Feedback>>
@@ -47,65 +48,62 @@ interface FeedbackRepository {
 class FeedbackRepositoryImpl @Inject constructor(
     private val feedbackApi: FeedbackApi,
     private val feedbackDao: FeedbackDao,
-    private val fileHelper: FileHelper
-) : FeedbackRepository {
+    private val fileHelper: FileHelper,
+    override val networkConnectivityManager: NetworkConnectivityManager
+) : FeedbackRepository, BaseRepository {
 
-    override fun getFeedbackForThesis(thesisId: String): Flow<NetworkResult<List<Feedback>>> = flow {
-        emit(NetworkResult.Loading)
+    override val TAG = "FeedbackRepoDebug"
 
-        // First emit data from local database
-        feedbackDao.getFeedbackForThesis(thesisId)
-            .map { feedbackWithComments -> feedbackWithComments.map { it.toFeedback() } }
-            .collect { localFeedback ->
-                emit(NetworkResult.Success(localFeedback))
-            }
+    override fun getFeedbackForThesis(thesisId: String): Flow<NetworkResult<List<Feedback>>> {
+        return getDataWithOfflineSupport(
+            localDataSource = {
+                try {
+                    val localFeedback = feedbackDao.getFeedbackForThesis(thesisId)
+                        .map { feedbackWithComments -> feedbackWithComments.map { it.toFeedback() } }
+                        .first()
+                    
+                    if (localFeedback.isNotEmpty()) localFeedback else null
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading feedback from local database: ${e.message}")
+                    null
+                }
+            },
+            remoteDataSource = {
+                val response = feedbackApi.getFeedbackForThesis(thesisId)
+                if (response.isSuccessful) {
+                    response.body()?.map { it.toFeedback() } ?: throw IOException("Empty response body")
+                } else {
+                    throw HttpException(response)
+                }
+            },
+            saveRemoteData = { feedbacks ->
+                feedbacks.forEach { feedback ->
+                    val feedbackEntity = FeedbackEntity(
+                        id = feedback.id,
+                        thesisId = feedback.thesisId,
+                        advisorId = feedback.advisorId,
+                        advisorName = feedback.advisorName,
+                        overallRemarks = feedback.overallRemarks,
+                        status = feedback.status,
+                        createdDate = feedback.createdDate
+                    )
 
-        // Then fetch from remote and update local
-        try {
-            val response = feedbackApi.getFeedbackForThesis(thesisId)
-            if (response.isSuccessful) {
-                response.body()?.let { dtos ->
-                    val feedbacks = dtos.map { it.toFeedback() }
-
-                    // Save to local database
-                    feedbacks.forEach { feedback ->
-                        val feedbackEntity = FeedbackEntity(
-                            id = feedback.id,
-                            thesisId = feedback.thesisId,
-                            advisorId = feedback.advisorId,
-                            advisorName = feedback.advisorName,
-                            overallRemarks = feedback.overallRemarks,
-                            status = feedback.status,
-                            createdDate = feedback.createdDate
+                    val commentEntities = feedback.inlineComments.map { comment ->
+                        InlineCommentEntity(
+                            id = comment.id,
+                            feedbackId = feedback.id,
+                            pageNumber = comment.pageNumber,
+                            positionX = comment.position.x,
+                            positionY = comment.position.y,
+                            content = comment.content,
+                            type = comment.type
                         )
-
-                        val commentEntities = feedback.inlineComments.map { comment ->
-                            InlineCommentEntity(
-                                id = comment.id,
-                                feedbackId = feedback.id,
-                                pageNumber = comment.pageNumber,
-                                positionX = comment.position.x,
-                                positionY = comment.position.y,
-                                content = comment.content,
-                                type = comment.type
-                            )
-                        }
-
-                        feedbackDao.insertFeedbackWithComments(feedbackEntity, commentEntities)
                     }
 
-                    emit(NetworkResult.Success(feedbacks))
-                } ?: emit(NetworkResult.Error(Exception("Empty response body")))
-            } else {
-                emit(NetworkResult.Error(HttpException(response)))
+                    feedbackDao.insertFeedbackWithComments(feedbackEntity, commentEntities)
+                }
             }
-        } catch (e: HttpException) {
-            emit(NetworkResult.Error(e))
-        } catch (e: IOException) {
-            emit(NetworkResult.Error(e))
-        } catch (e: Exception) {
-            emit(NetworkResult.Error(e))
-        }
+        )
     }
 
     override fun getFeedbackById(feedbackId: String): Flow<NetworkResult<Feedback>> = flow {
@@ -158,8 +156,6 @@ class FeedbackRepositoryImpl @Inject constructor(
 
     override suspend fun createFeedback(
         thesisId: String,
-        advisorId: String,
-        advisorName: String,
         overallRemarks: String,
         inlineComments: List<InlineComment>
     ): Flow<NetworkResult<Feedback>> = flow {
@@ -168,17 +164,15 @@ class FeedbackRepositoryImpl @Inject constructor(
         try {
             val commentRequests = inlineComments.map { comment ->
                 InlineCommentRequest(
+                    content = comment.content,
                     pageNumber = comment.pageNumber,
                     positionX = comment.position.x,
-                    positionY = comment.position.y,
-                    content = comment.content,
-                    type = comment.type
+                    positionY = comment.position.y
                 )
             }
 
             val request = CreateFeedbackRequest(
                 thesisId = thesisId,
-                advisorId = advisorId,
                 overallRemarks = overallRemarks,
                 inlineComments = commentRequests
             )
@@ -242,17 +236,15 @@ class FeedbackRepositoryImpl @Inject constructor(
 
             val commentRequests = inlineComments.map { comment ->
                 InlineCommentRequest(
+                    content = comment.content,
                     pageNumber = comment.pageNumber,
                     positionX = comment.position.x,
-                    positionY = comment.position.y,
-                    content = comment.content,
-                    type = comment.type
+                    positionY = comment.position.y
                 )
             }
 
             val request = CreateFeedbackRequest(
                 thesisId = existingFeedback.thesisId,
-                advisorId = existingFeedback.advisorId,
                 overallRemarks = overallRemarks,
                 inlineComments = commentRequests
             )

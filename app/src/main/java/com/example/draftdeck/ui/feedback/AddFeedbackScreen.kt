@@ -50,6 +50,18 @@ import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.ui.components.DraftDeckAppBar
 import com.example.draftdeck.ui.components.LoadingIndicator
 import java.util.UUID
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,22 +89,119 @@ fun AddFeedbackScreen(
     val addFeedbackResult by viewModel.addFeedbackResult.collectAsState()
     val updateFeedbackResult by viewModel.updateFeedbackResult.collectAsState()
 
+    val focusManager = LocalFocusManager.current
+    val commentContentFocusRequester = remember { FocusRequester() }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Check if user is available and display warning if not
+    val currentUser by viewModel.currentUser.collectAsState()
+
+    // Display an error message when needed
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Handle IME resources cleanup on lifecycle changes
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                // Clear focus when app goes to background
+                focusManager.clearFocus()
+            }
+        }
+        
+        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        onDispose {
+            // Clear focus before disposing
+            focusManager.clearFocus()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Function to reset comment input and close dialog
+    val resetAndCloseDialog = {
+        // Clear all input fields
+        commentContent = ""
+        commentPage = "1"
+        commentType = "Suggestion"
+        // Clear focus before closing dialog
+        focusManager.clearFocus()
+        // Close the dialog
+        showAddCommentDialog = false
+    }
+
     LaunchedEffect(thesisId) {
         viewModel.loadThesisDetails(thesisId)
+    }
+
+    // LaunchedEffect to log user information when screen is first displayed
+    LaunchedEffect(Unit) {
+        Log.d("AddFeedbackScreen", "Current user on init: ${currentUser}")
+    }
+
+    // LaunchedEffect that runs when currentUser changes
+    LaunchedEffect(currentUser) {
+        Log.d("AddFeedbackScreen", "Current user updated: ${currentUser}")
     }
 
     // Handle feedback submission success
     LaunchedEffect(addFeedbackResult, updateFeedbackResult) {
         val result = if (isUpdate) updateFeedbackResult else addFeedbackResult
-
-        if (result is NetworkResult.Success) {
-            if (isUpdate) {
-                viewModel.resetUpdateFeedbackResult()
-            } else {
-                viewModel.resetAddFeedbackResult()
+        
+        Log.d("AddFeedbackScreen", "Feedback result: $result")
+        
+        when (result) {
+            is NetworkResult.Success -> {
+                if (isUpdate) {
+                    viewModel.resetUpdateFeedbackResult()
+                } else {
+                    viewModel.resetAddFeedbackResult()
+                }
+                errorMessage = null
+                onFeedbackSuccess()
             }
-            onFeedbackSuccess()
+            is NetworkResult.Error -> {
+                Log.e("AddFeedbackScreen", "Error submitting feedback: ${result.exception.message}", result.exception)
+                errorMessage = "Error: ${result.exception.message ?: "Unknown error"}"
+            }
+            is NetworkResult.Loading -> {
+                Log.d("AddFeedbackScreen", "Feedback submission in progress...")
+            }
+            else -> { /* Do nothing for null or idle state */ }
         }
+    }
+
+    // Submit Button - Use separate remember function to ensure click handler works properly
+    val submitFeedback: () -> Unit = {
+        // Log before submitting
+        Log.d("AddFeedbackScreen", "Submit function called. IsUpdate: $isUpdate, FeedbackId: $feedbackId")
+        Log.d("AddFeedbackScreen", "Remarks: $overallRemarks, Comments count: ${inlineComments.size}")
+        
+        // Clear focus first to ensure IME callbacks are released
+        focusManager.clearFocus()
+        
+        // Check if user is available
+        if (currentUser == null) {
+            errorMessage = "User not authenticated. Please log in again."
+            Log.e("AddFeedbackScreen", "Current user is null when trying to submit feedback")
+        } else {
+            errorMessage = null
+            
+            if (isUpdate && feedbackId != null) {
+                viewModel.updateFeedback(
+                    feedbackId = feedbackId,
+                    overallRemarks = overallRemarks,
+                    inlineComments = inlineComments
+                )
+            } else {
+                viewModel.addFeedback(
+                    thesisId = thesisId,
+                    overallRemarks = overallRemarks,
+                    inlineComments = inlineComments
+                )
+            }
+        }
+        Unit  // Explicitly return Unit
     }
 
     Scaffold(
@@ -157,6 +266,16 @@ fun AddFeedbackScreen(
                     onValueChange = { overallRemarks = it },
                     label = { Text("Overall Remarks") },
                     placeholder = { Text("Provide general feedback about the thesis") },
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Default
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            // Clear focus explicitly to properly handle IME callbacks
+                            focusManager.clearFocus()
+                        }
+                    ),
                     minLines = 4,
                     maxLines = 8,
                     modifier = Modifier.fillMaxWidth()
@@ -283,119 +402,154 @@ fun AddFeedbackScreen(
 
                 // Comment Dialog
                 if (showAddCommentDialog) {
-                    androidx.compose.ui.window.Dialog(
-                        onDismissRequest = { showAddCommentDialog = false }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .padding(16.dp)
+                    // Using key to force proper recomposition and cleanup
+                    androidx.compose.runtime.key(Unit) {
+                        androidx.compose.ui.window.Dialog(
+                            onDismissRequest = { 
+                                resetAndCloseDialog()
+                            }
                         ) {
-                            Text(
-                                text = "Add Comment",
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            OutlinedTextField(
-                                value = commentPage,
-                                onValueChange = { commentPage = it },
-                                label = { Text("Page Number") },
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            ExposedDropdownMenuBox(
-                                expanded = isCommentTypeDropdownExpanded,
-                                onExpandedChange = { isCommentTypeDropdownExpanded = it },
-                                modifier = Modifier.fillMaxWidth()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.surface,
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(16.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = commentType,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Comment Type") },
-                                    trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCommentTypeDropdownExpanded)
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .menuAnchor()
+                                Text(
+                                    text = "Add Comment",
+                                    style = MaterialTheme.typography.headlineSmall
                                 )
 
-                                ExposedDropdownMenu(
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                OutlinedTextField(
+                                    value = commentPage,
+                                    onValueChange = { commentPage = it },
+                                    label = { Text("Page Number") },
+                                    keyboardOptions = KeyboardOptions.Default.copy(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onNext = {
+                                            commentContentFocusRequester.requestFocus()
+                                        }
+                                    ),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                ExposedDropdownMenuBox(
                                     expanded = isCommentTypeDropdownExpanded,
-                                    onDismissRequest = { isCommentTypeDropdownExpanded = false }
+                                    onExpandedChange = { isCommentTypeDropdownExpanded = it },
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    commentTypes.forEach { type ->
-                                        DropdownMenuItem(
-                                            text = { Text(type) },
-                                            onClick = {
-                                                commentType = type
-                                                isCommentTypeDropdownExpanded = false
-                                            }
-                                        )
+                                    OutlinedTextField(
+                                        value = commentType,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("Comment Type") },
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCommentTypeDropdownExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor()
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = isCommentTypeDropdownExpanded,
+                                        onDismissRequest = { isCommentTypeDropdownExpanded = false }
+                                    ) {
+                                        commentTypes.forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type) },
+                                                onClick = {
+                                                    commentType = type
+                                                    isCommentTypeDropdownExpanded = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                            OutlinedTextField(
-                                value = commentContent,
-                                onValueChange = { commentContent = it },
-                                label = { Text("Comment") },
-                                placeholder = { Text("Write your comment here") },
-                                minLines = 3,
-                                maxLines = 5,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(
-                                    onClick = { showAddCommentDialog = false }
-                                ) {
-                                    Text("Cancel")
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Button(
-                                    onClick = {
-                                        if (commentContent.isNotBlank() && commentPage.isNotBlank()) {
-                                            val pageNum = commentPage.toIntOrNull() ?: 1
-                                            inlineComments.add(
-                                                InlineComment(
-                                                    id = UUID.randomUUID().toString(),
-                                                    pageNumber = pageNum,
-                                                    position = CommentPosition(x = 0f, y = 0f), // Default position
-                                                    content = commentContent,
-                                                    type = commentType
+                                OutlinedTextField(
+                                    value = commentContent,
+                                    onValueChange = { commentContent = it },
+                                    label = { Text("Comment") },
+                                    placeholder = { Text("Write your comment here") },
+                                    keyboardOptions = KeyboardOptions.Default.copy(
+                                        keyboardType = KeyboardType.Text,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            // Clear focus first to ensure IME callbacks are handled
+                                            focusManager.clearFocus()
+                                            
+                                            if (commentContent.isNotBlank() && commentPage.isNotBlank()) {
+                                                val pageNum = commentPage.toIntOrNull() ?: 1
+                                                inlineComments.add(
+                                                    InlineComment(
+                                                        id = UUID.randomUUID().toString(),
+                                                        pageNumber = pageNum,
+                                                        position = CommentPosition(x = 0f, y = 0f),
+                                                        content = commentContent,
+                                                        type = commentType
+                                                    )
                                                 )
-                                            )
-                                            commentContent = ""
-                                            commentPage = "1"
-                                            commentType = "Suggestion"
-                                            showAddCommentDialog = false
+                                                resetAndCloseDialog()
+                                            }
                                         }
-                                    },
-                                    enabled = commentContent.isNotBlank() && commentPage.isNotBlank()
+                                    ),
+                                    minLines = 3,
+                                    maxLines = 5,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(commentContentFocusRequester)
+                                )
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
                                 ) {
-                                    Text("Add")
+                                    TextButton(
+                                        onClick = { resetAndCloseDialog() }
+                                    ) {
+                                        Text("Cancel")
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Button(
+                                        onClick = {
+                                            if (commentContent.isNotBlank() && commentPage.isNotBlank()) {
+                                                val pageNum = commentPage.toIntOrNull() ?: 1
+                                                inlineComments.add(
+                                                    InlineComment(
+                                                        id = UUID.randomUUID().toString(),
+                                                        pageNumber = pageNum,
+                                                        position = CommentPosition(x = 0f, y = 0f),
+                                                        content = commentContent,
+                                                        type = commentType
+                                                    )
+                                                )
+                                                resetAndCloseDialog()
+                                            }
+                                        },
+                                        enabled = commentContent.isNotBlank() && commentPage.isNotBlank()
+                                    ) {
+                                        Text("Add")
+                                    }
                                 }
                             }
                         }
@@ -406,25 +560,22 @@ fun AddFeedbackScreen(
 
                 // Submit Button
                 Button(
-                    onClick = {
-                        if (isUpdate && feedbackId != null) {
-                            viewModel.updateFeedback(
-                                feedbackId = feedbackId,
-                                overallRemarks = overallRemarks,
-                                inlineComments = inlineComments
-                            )
-                        } else {
-                            viewModel.addFeedback(
-                                thesisId = thesisId,
-                                overallRemarks = overallRemarks,
-                                inlineComments = inlineComments
-                            )
-                        }
-                    },
+                    onClick = submitFeedback,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = overallRemarks.isNotBlank()
                 ) {
                     Text(if (isUpdate) "Update Feedback" else "Submit Feedback")
+                }
+
+                // After the submit button, add error message display
+                Spacer(modifier = Modifier.height(8.dp))
+
+                errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 

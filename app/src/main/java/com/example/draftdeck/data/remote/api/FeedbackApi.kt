@@ -1,6 +1,7 @@
 package com.example.draftdeck.data.remote.api
 
 import com.example.draftdeck.data.remote.dto.FeedbackDto
+import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -10,18 +11,34 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 data class CreateFeedbackRequest(
+    @SerializedName("thesis_id")
     val thesisId: String,
-    val advisorId: String,
+    
+    @SerializedName("overall_comments")
     val overallRemarks: String,
-    val inlineComments: List<InlineCommentRequest>
+    
+    @SerializedName("comments")
+    val inlineComments: List<InlineCommentRequest>,
+    
+    @SerializedName("rating")
+    val rating: Int? = null,
+    
+    @SerializedName("recommendations")
+    val recommendations: String? = null
 )
 
 data class InlineCommentRequest(
-    val pageNumber: Int,
-    val positionX: Float,
-    val positionY: Float,
+    @SerializedName("content")
     val content: String,
-    val type: String
+    
+    @SerializedName("page")
+    val pageNumber: Int,
+    
+    @SerializedName("position_x")
+    val positionX: Float,
+    
+    @SerializedName("position_y")
+    val positionY: Float
 )
 
 interface FeedbackApi {

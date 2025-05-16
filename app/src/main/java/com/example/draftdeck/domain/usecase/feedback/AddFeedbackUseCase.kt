@@ -19,8 +19,6 @@ class AddFeedbackUseCase @Inject constructor(
     ): Flow<NetworkResult<Feedback>> {
         return feedbackRepository.createFeedback(
             thesisId = thesisId,
-            advisorId = currentUser.id,
-            advisorName = "${currentUser.firstName} ${currentUser.lastName}",
             overallRemarks = overallRemarks,
             inlineComments = inlineComments
         )

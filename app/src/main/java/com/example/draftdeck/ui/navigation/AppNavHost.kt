@@ -1,5 +1,6 @@
 package com.example.draftdeck.ui.navigation
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -291,6 +292,7 @@ fun AppNavHost(
                     navController.navigate(Screen.FeedbackList.createRoute(thesisId))
                 },
                 onNavigateToUpdateThesis = { thesisId ->
+                    Log.d("AppNavHost", "onNavigateToUpdateThesis called with thesisId: $thesisId")
                     navController.navigate(Screen.UpdateThesis.createRoute(thesisId))
                 },
                 onNavigateToAddFeedback = { thesisId ->
@@ -317,6 +319,7 @@ fun AppNavHost(
             )
         ) { backStackEntry ->
             val thesisId = backStackEntry.arguments?.getString("thesisId") ?: ""
+            Log.d("AppNavHost", "Navigated to UpdateThesis with thesis ID: $thesisId")
 
             UploadThesisScreen(
                 thesisId = thesisId,

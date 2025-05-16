@@ -1,17 +1,24 @@
 package com.example.draftdeck.di
 
+import android.content.Context
 import android.util.Log
 import com.example.draftdeck.data.remote.api.AuthApi
 import com.example.draftdeck.data.remote.api.FeedbackApi
 import com.example.draftdeck.data.remote.api.ThesisApi
 import com.example.draftdeck.data.remote.api.UserApi
+import com.example.draftdeck.domain.util.AuthNavigator
 import com.example.draftdeck.domain.util.Constants
+import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import com.example.draftdeck.domain.util.SessionManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -30,7 +37,15 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor {
+    fun provideNetworkConnectivityManager(
+        @ApplicationContext context: Context
+    ): NetworkConnectivityManager {
+        return NetworkConnectivityManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthInterceptor(sessionManager: SessionManager, authNavigator: AuthNavigator): Interceptor {
         return Interceptor { chain ->
             val originalRequest = chain.request()
             Log.d(TAG, "Intercepting request for: ${originalRequest.url}")
@@ -77,10 +92,11 @@ object NetworkModule {
             // Check if we got a 401 Unauthorized response
             if (response.code == 401) {
                 Log.e(TAG, "Authentication failed (401) for request: ${originalRequest.url}")
-                // In a production app, you might implement token refresh here
                 
-                // For now, we'll just log the error
-                // Consider implementing refresh token logic here in the future
+                // Handle 401 unauthorized response by navigating to login screen
+                CoroutineScope(Dispatchers.IO).launch {
+                    authNavigator.onUnauthorized()
+                }
             }
             
             response

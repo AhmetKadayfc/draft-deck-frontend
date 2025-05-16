@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
@@ -35,13 +34,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.example.draftdeck.data.model.Thesis
-import com.example.draftdeck.data.model.User
 import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
@@ -52,6 +50,8 @@ import com.example.draftdeck.ui.thesis.components.ThesisStatusBadge
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.draftdeck.ui.components.OfflineBanner
+import android.util.Log
 
 @Composable
 fun ThesisDetailScreen(
@@ -67,6 +67,7 @@ fun ThesisDetailScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     val thesisDetails by viewModel.thesisDetails.collectAsState()
     val downloadResult by viewModel.downloadThesisResult.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
     LaunchedEffect(thesisId) {
         viewModel.loadThesisDetails(thesisId)
@@ -102,10 +103,14 @@ fun ThesisDetailScreen(
                 showBackButton = true,
                 onBackClick = onBackClick,
                 actions = {
-                    IconButton(onClick = { viewModel.downloadThesis(thesisId, context) }) {
+                    IconButton(
+                        onClick = { viewModel.downloadThesis(thesisId, context) },
+                        enabled = isOnline
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Download,
-                            contentDescription = "Download Thesis"
+                            contentDescription = "Download Thesis",
+                            modifier = Modifier.alpha(if (isOnline) 1f else 0.5f)
                         )
                     }
                 }
@@ -117,249 +122,265 @@ fun ThesisDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (val details = thesisDetails) {
-                is NetworkResult.Idle -> {
-                    // Initial state, do nothing
-                }
-                is NetworkResult.Loading -> {
-                    LoadingIndicator(fullScreen = true)
-                }
-                is NetworkResult.Success -> {
-                    val thesis = details.data
-                    val isStudent = currentUser?.role == Constants.ROLE_STUDENT
-                    val isAdvisor = currentUser?.role == Constants.ROLE_ADVISOR
-                    val isAdmin = currentUser?.role == Constants.ROLE_ADMIN
-                    val isOwner = currentUser?.id == thesis.studentId
+            Column {
+                OfflineBanner(isOffline = !isOnline)
+                
+                when (val details = thesisDetails) {
+                    is NetworkResult.Idle -> {
+                        // Initial state, do nothing
+                    }
+                    is NetworkResult.Loading -> {
+                        LoadingIndicator(fullScreen = true)
+                    }
+                    is NetworkResult.Success -> {
+                        val thesis = details.data
+                        val isStudent = currentUser?.role == Constants.ROLE_STUDENT
+                        val isAdvisor = currentUser?.role == Constants.ROLE_ADVISOR
+                        val isAdmin = currentUser?.role == Constants.ROLE_ADMIN
+                        val isOwner = currentUser?.id == thesis.studentId
+                        
+                        Log.d("ThesisDetailScreen", "User role check - isStudent: $isStudent, isOwner: $isOwner")
+                        Log.d("ThesisDetailScreen", "User details - role: ${currentUser?.role}, id: ${currentUser?.id}, studentId: ${thesis.studentId}")
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = 2.dp
-                            )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                elevation = CardDefaults.cardElevation(
+                                    defaultElevation = 2.dp
+                                )
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier.weight(1f)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = thesis.title,
-                                            style = MaterialTheme.typography.headlineSmall
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = thesis.title,
+                                                style = MaterialTheme.typography.headlineSmall
+                                            )
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                ThesisStatusBadge(status = thesis.status)
+
+                                                Spacer(modifier = Modifier.width(8.dp))
+
+                                                Text(
+                                                    text = "v${thesis.version} | ${
+                                                        when(thesis.submissionType.lowercase()) {
+                                                            Constants.THESIS_TYPE_DRAFT -> Constants.THESIS_TYPE_DRAFT_DISPLAY
+                                                            Constants.THESIS_TYPE_FINAL -> Constants.THESIS_TYPE_FINAL_DISPLAY
+                                                            else -> thesis.submissionType.replaceFirstChar { it.uppercase() }
+                                                        }
+                                                    }",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Text(
+                                        text = "Description",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = thesis.description,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Divider()
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = "Student",
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
 
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            ThesisStatusBadge(status = thesis.status)
-
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "Student",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
 
                                             Text(
-                                                text = "v${thesis.version} | ${thesis.submissionType}",
+                                                text = thesis.studentName,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = "Advisor",
+                                            tint = MaterialTheme.colorScheme.secondary
+                                        )
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        Column {
+                                            Text(
+                                                text = "Advisor",
                                                 style = MaterialTheme.typography.bodySmall
+                                            )
+
+                                            Text(
+                                                text = thesis.advisorName,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Row {
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = "Submission Date",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+
+                                            Text(
+                                                text = formatDate(thesis.submissionDate),
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = "Last Updated",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+
+                                            Text(
+                                                text = formatDate(thesis.lastUpdated),
+                                                style = MaterialTheme.typography.bodyMedium
                                             )
                                         }
                                     }
                                 }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text(
-                                    text = "Description",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = thesis.description,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Divider()
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Student",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    Column {
-                                        Text(
-                                            text = "Student",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-
-                                        Text(
-                                            text = thesis.studentName,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Advisor",
-                                        tint = MaterialTheme.colorScheme.secondary
-                                    )
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    Column {
-                                        Text(
-                                            text = "Advisor",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-
-                                        Text(
-                                            text = thesis.advisorName,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Row {
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            text = "Submission Date",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-
-                                        Text(
-                                            text = formatDate(thesis.submissionDate),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            text = "Last Updated",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-
-                                        Text(
-                                            text = formatDate(thesis.lastUpdated),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Actions based on user role
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Student actions
-                            if (isStudent && isOwner) {
-                                OutlinedButton(
-                                    onClick = { onNavigateToUpdateThesis(thesis.id) },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit"
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Edit")
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
                             }
 
-                            Button(
-                                onClick = { onNavigateToFeedback(thesis.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Comment,
-                                    contentDescription = "Feedback"
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Feedback")
-                            }
-                        }
+                            Spacer(modifier = Modifier.height(24.dp))
 
-                        // Advisor actions
-                        if (isAdvisor && !isAdmin) {
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Button(
-                                onClick = { onNavigateToAddFeedback(thesis.id) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Add Feedback")
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Status management for advisor
+                            // Actions based on user role
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Button(
-                                    onClick = { viewModel.updateThesisStatus(thesis.id, Constants.STATUS_APPROVED) },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = thesis.status != Constants.STATUS_APPROVED
-                                ) {
-                                    Text("Approve")
+                                // Student actions - only show edit button to students who own the thesis
+                                if (isStudent && isOwner) {
+                                    OutlinedButton(
+                                        onClick = { 
+                                            // Navigate to update thesis screen
+                                            onNavigateToUpdateThesis(thesis.id)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit"
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Edit")
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
 
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                OutlinedButton(
-                                    onClick = { viewModel.updateThesisStatus(thesis.id, Constants.STATUS_REJECTED) },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = thesis.status != Constants.STATUS_REJECTED
+                                Button(
+                                    onClick = { onNavigateToFeedback(thesis.id) },
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("Reject")
+                                    Icon(
+                                        imageVector = Icons.Default.Comment,
+                                        contentDescription = "Feedback"
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Feedback")
+                                }
+                            }
+
+                            // Advisor actions
+                            if (isAdvisor && !isAdmin) {
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Button(
+                                    onClick = { onNavigateToAddFeedback(thesis.id) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Add Feedback")
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Status management for advisor
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.updateThesisStatus(thesis.id, Constants.STATUS_APPROVED) },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = thesis.status != Constants.STATUS_APPROVED
+                                    ) {
+                                        Text("Approve")
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    OutlinedButton(
+                                        onClick = { viewModel.updateThesisStatus(thesis.id, Constants.STATUS_REJECTED) },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = thesis.status != Constants.STATUS_REJECTED
+                                    ) {
+                                        Text("Reject")
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                is NetworkResult.Error -> {
-                    ErrorView(
-                        message = "Failed to load thesis: ${details.exception.message}",
-                        onRetry = { viewModel.loadThesisDetails(thesisId) }
-                    )
+                    is NetworkResult.Error -> {
+                        ErrorView(
+                            message = "Failed to load thesis: ${details.exception.message}",
+                            onRetry = { viewModel.loadThesisDetails(thesisId) }
+                        )
+                    }
                 }
             }
 

@@ -1,5 +1,7 @@
 package com.example.draftdeck.ui.navigation
 
+import android.util.Log
+
 sealed class Screen(val route: String) {
     // Auth screens
     object Welcome : Screen("welcome")
@@ -27,7 +29,11 @@ sealed class Screen(val route: String) {
     }
     object UploadThesis : Screen("upload_thesis")
     object UpdateThesis : Screen("update_thesis/{thesisId}") {
-        fun createRoute(thesisId: String): String = "update_thesis/$thesisId"
+        fun createRoute(thesisId: String): String {
+            val route = "update_thesis/$thesisId"
+            Log.d("Screen", "UpdateThesis.createRoute called with thesisId: $thesisId, route: $route")
+            return route
+        }
     }
 
     // Feedback screens

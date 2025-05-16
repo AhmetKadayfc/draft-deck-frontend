@@ -11,10 +11,9 @@ import com.example.draftdeck.data.remote.api.ThesisApi
 import com.example.draftdeck.data.remote.api.adminAssignAdvisorToThesis
 import com.example.draftdeck.data.remote.dto.toThesis
 import com.example.draftdeck.domain.util.FileHelper
+import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -76,71 +75,51 @@ class ThesisRepositoryImpl @Inject constructor(
     private val thesisApi: ThesisApi,
     private val thesisDao: ThesisDao,
     private val fileHelper: FileHelper,
-    private val userRepository: UserRepository
-) : ThesisRepository {
+    private val userRepository: UserRepository,
+    override val networkConnectivityManager: NetworkConnectivityManager
+) : ThesisRepository, BaseRepository {
 
-    private val TAG = "ThesisRepoDebug"
+    override val TAG = "ThesisRepoDebug"
+    private val CACHE_TIMEOUT_MS = 60 * 1000L // 1 minute
 
     override fun getTheses(
         status: String?, 
         type: String?, 
         query: String?,
         additionalParams: Map<String, String>
-    ): Flow<NetworkResult<List<Thesis>>> = flow {
-        val cacheKey = "theses-${status ?: "all"}-${type ?: "all"}-${query ?: "none"}"
-        Log.d(TAG, "Getting theses with filters - status: $status, type: $type, query: $query (cache key: $cacheKey)")
-        emit(NetworkResult.Loading)
-
-        // Track if we need to make a network request
-        var shouldMakeNetworkRequest = true
-
-        // First emit data from local database if available
-        try {
-            Log.d(TAG, "Fetching theses from local database")
-            // We need to get all theses from local db and filter them here,
-            // since we can't know which user-specific theses are stored locally
-            val allLocalTheses = thesisDao.getAllTheses().first()
-            
-            val filteredLocalTheses = allLocalTheses.filter { entity ->
-                val matchesStatus = status == null || entity.status == status
-                val matchesType = type == null || entity.submissionType == type
-                val matchesQuery = query == null || 
-                    entity.title.contains(query, ignoreCase = true) || 
-                    entity.description.contains(query, ignoreCase = true)
-                
-                matchesStatus && matchesType && matchesQuery
-            }.map { it.toThesis() }
-            
-            if (filteredLocalTheses.isNotEmpty()) {
-                Log.d(TAG, "Emitting ${filteredLocalTheses.size} theses from local database")
-                emit(NetworkResult.Success(filteredLocalTheses))
-                
-                // If we have data in the cache that's less than 1 minute old, skip network request
-                val newestThesis = filteredLocalTheses.maxByOrNull { it.lastUpdated }
-                newestThesis?.let {
-                    val cacheAgeMs = System.currentTimeMillis() - it.lastUpdated.time
-                    if (cacheAgeMs < CACHE_TIMEOUT_MS) {
-                        Log.d(TAG, "Using cached data that's ${cacheAgeMs/1000}s old (timeout: ${CACHE_TIMEOUT_MS/1000}s)")
-                        shouldMakeNetworkRequest = false
+    ): Flow<NetworkResult<List<Thesis>>> {
+        return getDataWithOfflineSupport(
+            localDataSource = {
+                // Get all theses from local db and filter them here
+                try {
+                    Log.d(TAG, "Fetching theses from local database")
+                    val allLocalTheses = thesisDao.getAllTheses().first()
+                    
+                    val filteredLocalTheses = allLocalTheses.filter { entity ->
+                        val matchesStatus = status == null || entity.status == status
+                        val matchesType = type == null || entity.submissionType == type
+                        val matchesQuery = query == null || 
+                            entity.title.contains(query, ignoreCase = true) || 
+                            entity.description.contains(query, ignoreCase = true)
+                        
+                        matchesStatus && matchesType && matchesQuery
+                    }.map { it.toThesis() }
+                    
+                    if (filteredLocalTheses.isNotEmpty()) {
+                        filteredLocalTheses
+                    } else {
+                        null
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading from local database: ${e.message}")
+                    null
                 }
-            } else {
-                Log.d(TAG, "No matching local data available, will make network request")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reading from local database: ${e.message}")
-            // Continue to API call if local database fails
-        }
-
-        // Then make network request if needed
-        if (shouldMakeNetworkRequest) {
-            try {
-                Log.d(TAG, "Fetching theses from remote API with query params")
-                
+            },
+            remoteDataSource = {
                 // Build query parameters to match Flask API expectations
                 val queryParams = mutableMapOf<String, String>()
                 status?.let { queryParams["status"] = it }
-                type?.let { queryParams["type"] = it } // Flask API expects "type" not "thesis_type"
+                type?.let { queryParams["type"] = it } 
                 query?.let { queryParams["query"] = it }
                 
                 // Add any additional parameters
@@ -152,62 +131,19 @@ class ThesisRepositoryImpl @Inject constructor(
                 
                 Log.d(TAG, "API Request: GET /theses with params: $queryParams")
                 
-                // Temporary log for debugging
-                try {
-                    if (additionalParams.containsKey("student_id")) {
-                        val studentId = additionalParams["student_id"]
-                        Log.d(TAG, "Specifically looking for theses with student_id: $studentId")
-                        
-                        // Try to get all theses first to compare
-                        val allThesesResponse = thesisApi.getTheses(emptyMap())
-                        if (allThesesResponse.isSuccessful && allThesesResponse.body() != null) {
-                            val allTheses = allThesesResponse.body()!!.theses
-                            Log.d(TAG, "Server has ${allTheses.size} total theses")
-                            
-                            // Check which theses have matching student ID
-                            val matchingTheses = allTheses.filter { it.studentId == studentId }
-                            Log.d(TAG, "Found ${matchingTheses.size} theses with matching student_id: $studentId")
-                            
-                            if (matchingTheses.isNotEmpty()) {
-                                Log.d(TAG, "First matching thesis: ${matchingTheses[0].title}")
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error during debugging: ${e.message}")
-                }
-                
                 val response = thesisApi.getTheses(queryParams)
-                Log.d(TAG, "API response received: ${response.code()} - ${response.message()}")
-                
-                if (response.isSuccessful) {
-                    response.body()?.let { apiResponse ->
-                        val theses = apiResponse.theses.map { it.toThesis() }
-                        Log.d(TAG, "Received ${theses.size} theses from API")
-                        thesisDao.insertTheses(theses.map { it.toThesisEntity() })
-                        emit(NetworkResult.Success(theses))
-                    } ?: run {
-                        Log.e(TAG, "Empty response body from API")
-                        emit(NetworkResult.Error(Exception("Empty response body")))
-                    }
+                if (response.isSuccessful && response.body() != null) {
+                    response.body()!!.theses.map { it.toThesis() }
                 } else {
                     val errorBody = response.errorBody()?.string()
                     Log.e(TAG, "API error: ${response.code()} - ${response.message()} - $errorBody")
-                    emit(NetworkResult.Error(HttpException(response)))
+                    throw HttpException(response)
                 }
-            } catch (e: HttpException) {
-                Log.e(TAG, "HTTP Exception: ${e.message()}", e)
-                emit(NetworkResult.Error(e))
-            } catch (e: IOException) {
-                Log.e(TAG, "IO Exception: ${e.message}", e)
-                emit(NetworkResult.Error(e))
-            } catch (e: Exception) {
-                Log.e(TAG, "General Exception: ${e.message}", e)
-                emit(NetworkResult.Error(e))
+            },
+            saveRemoteData = { theses ->
+                thesisDao.insertTheses(theses.map { it.toThesisEntity() })
             }
-        } else {
-            Log.d(TAG, "Skipping network request, using cached data")
-        }
+        )
     }
 
     override fun getThesisById(thesisId: String): Flow<NetworkResult<Thesis>> = flow {
@@ -307,6 +243,13 @@ class ThesisRepositoryImpl @Inject constructor(
                             java.util.UUID.randomUUID().toString()
                         }
                         
+                        // Determine file type based on file extension
+                        val fileType = when {
+                            file.name.endsWith(".pdf", ignoreCase = true) -> "pdf"
+                            file.name.endsWith(".docx", ignoreCase = true) -> "docx" 
+                            else -> "" // Default empty if unknown
+                        }
+                        
                         // Create a thesis object with the data we have
                         val thesis = Thesis(
                             id = thesisId,
@@ -318,7 +261,7 @@ class ThesisRepositoryImpl @Inject constructor(
                             advisorName = "Advisor", // We'll update this with real data later if possible
                             submissionType = submissionType,
                             fileUrl = "", // Will be populated when downloading
-                            fileType = if (file.name.endsWith(".pdf", ignoreCase = true)) "pdf" else "docx",
+                            fileType = fileType,
                             version = 1,
                             status = createResponse.thesis.status,
                             submissionDate = createResponse.thesis.createdAt ?: now,
@@ -407,9 +350,25 @@ class ThesisRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful) {
                 response.body()?.let { dto ->
+                    // Convert the DTO to a domain model
                     val thesis = dto.toThesis()
-                    thesisDao.insertThesis(thesis.toThesisEntity())
-                    emit(NetworkResult.Success(thesis))
+                    
+                    // If file was updated, ensure the fileType is set correctly
+                    val updatedThesis = if (file != null) {
+                        // Extract file type from file name
+                        val fileType = when {
+                            file.name.endsWith(".pdf", ignoreCase = true) -> "pdf"
+                            file.name.endsWith(".docx", ignoreCase = true) -> "docx"
+                            else -> thesis.fileType // Keep existing if can't determine
+                        }
+                        thesis.copy(fileType = fileType)
+                    } else {
+                        thesis
+                    }
+                    
+                    // Save to database and emit result
+                    thesisDao.insertThesis(updatedThesis.toThesisEntity())
+                    emit(NetworkResult.Success(updatedThesis))
                 } ?: emit(NetworkResult.Error(Exception("Empty response body")))
             } else {
                 emit(NetworkResult.Error(HttpException(response)))
@@ -605,10 +564,5 @@ class ThesisRepositoryImpl @Inject constructor(
             Log.e("ThesisRepo", "Exception in adminAssignAdvisorToThesis: ${e.message}", e)
             emit(NetworkResult.Error(e))
         }
-    }
-
-    companion object {
-        // Cache timeout - how long to consider local data fresh (1 minute)
-        private const val CACHE_TIMEOUT_MS = 60 * 1000L
     }
 }

@@ -21,7 +21,10 @@ data class ThesisCreateResponseDto(
     val thesisType: String,
     
     @SerializedName("created_at")
-    val createdAt: Date?
+    val createdAt: Date?,
+    
+    @SerializedName("file_name")
+    val fileName: String? = null
 )
 
 /**
@@ -36,6 +39,14 @@ fun ThesisCreateResponseDto.toThesis(
     advisorName: String = ""
 ): Thesis {
     val now = Date()
+    
+    // Determine file type from file name
+    val fileType = when {
+        fileName?.endsWith(".pdf", ignoreCase = true) == true -> "pdf"
+        fileName?.endsWith(".docx", ignoreCase = true) == true -> "docx"
+        else -> "" // Default to empty string if file name is missing or unrecognized
+    }
+    
     return Thesis(
         id = id,
         title = title,
@@ -46,7 +57,7 @@ fun ThesisCreateResponseDto.toThesis(
         advisorName = advisorName,
         submissionType = thesisType,
         fileUrl = "", // Will be empty for newly created theses
-        fileType = "", // Will be empty for newly created theses
+        fileType = fileType,
         version = 1, // First version
         status = status,
         submissionDate = createdAt ?: now,

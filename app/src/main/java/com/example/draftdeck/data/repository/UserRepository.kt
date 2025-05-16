@@ -1,7 +1,6 @@
 package com.example.draftdeck.data.repository
 
 import com.example.draftdeck.data.local.dao.UserDao
-import com.example.draftdeck.data.local.entity.UserEntity
 import com.example.draftdeck.data.local.entity.toUser
 import com.example.draftdeck.data.model.User
 import com.example.draftdeck.data.remote.NetworkResult
@@ -9,10 +8,10 @@ import com.example.draftdeck.data.remote.api.UserApi
 import com.example.draftdeck.data.remote.api.UpdateProfileRequest
 import com.example.draftdeck.data.remote.dto.toUser
 import com.example.draftdeck.data.local.entity.toUserEntity
+import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import com.example.draftdeck.domain.util.SessionManager
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
@@ -30,7 +29,7 @@ interface UserRepository {
     /**
      * Get a user by their ID
      */
-    suspend fun getUserById(userId: String): Flow<User?>
+    suspend fun getUserById(userId: String): Flow<NetworkResult<User>>
     
     /**
      * Get users by role (student, advisor, admin)
@@ -54,41 +53,38 @@ interface UserRepository {
 class UserRepositoryImpl @Inject constructor(
     private val userApi: UserApi,
     private val userDao: UserDao,
-    private val sessionManager: SessionManager
-) : UserRepository {
+    private val sessionManager: SessionManager,
+    override val networkConnectivityManager: NetworkConnectivityManager
+) : UserRepository, BaseRepository {
+
+    override val TAG = "UserRepoDebug"
 
     override fun getCurrentUser(): Flow<User?> {
         return sessionManager.getUserFlow()
     }
     
-    override suspend fun getUserById(userId: String): Flow<User?> = flow {
-        // First try to get from local database
-        try {
-            // Emit local data first
-            userDao.getUserById(userId).collect { userEntity ->
-                if (userEntity != null) {
-                    emit(userEntity.toUser())
+    override suspend fun getUserById(userId: String): Flow<NetworkResult<User>> {
+        return getDataWithOfflineSupport(
+            localDataSource = {
+                try {
+                    userDao.getUserById(userId).first()?.toUser()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading user from local database: ${e.message}")
+                    null
                 }
-            }
-        } catch (e: Exception) {
-            // Continue to API call if local database fails
-        }
-        
-        // Then try to get from API
-        try {
-            val response = userApi.getUserById(userId)
-            if (response.isSuccessful) {
-                response.body()?.let { userDto ->
-                    val user = userDto.toUser()
-                    // Save to local database
-                    userDao.insertUser(user.toUserEntity())
-                    emit(user)
+            },
+            remoteDataSource = {
+                val response = userApi.getUserById(userId)
+                if (response.isSuccessful) {
+                    response.body()?.toUser() ?: throw IOException("Empty response body")
+                } else {
+                    throw HttpException(response)
                 }
+            },
+            saveRemoteData = { user ->
+                userDao.insertUser(user.toUserEntity())
             }
-        } catch (e: Exception) {
-            // If API fails, we already emitted the local user if available
-            emit(null)
-        }
+        )
     }
     
     override suspend fun getUsersByRole(role: String): List<User> {

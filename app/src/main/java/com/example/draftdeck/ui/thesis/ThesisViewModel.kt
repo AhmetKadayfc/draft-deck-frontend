@@ -16,15 +16,16 @@ import com.example.draftdeck.domain.usecase.thesis.UpdateThesisStatusUseCase
 import com.example.draftdeck.domain.usecase.thesis.UpdateThesisUseCase
 import com.example.draftdeck.domain.usecase.thesis.UploadThesisUseCase
 import com.example.draftdeck.domain.util.Constants
+import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import android.util.Log
 
 @HiltViewModel
 class ThesisViewModel @Inject constructor(
@@ -34,7 +35,8 @@ class ThesisViewModel @Inject constructor(
     private val updateThesisUseCase: UpdateThesisUseCase,
     private val updateThesisStatusUseCase: UpdateThesisStatusUseCase,
     private val downloadThesisUseCase: DownloadThesisUseCase,
-    private val getFeedbackForThesisUseCase: GetFeedbackForThesisUseCase
+    private val getFeedbackForThesisUseCase: GetFeedbackForThesisUseCase,
+    private val networkConnectivityManager: NetworkConnectivityManager
 ) : ViewModel() {
 
     val currentUser: StateFlow<User?> = getCurrentUserUseCase()
@@ -55,18 +57,63 @@ class ThesisViewModel @Inject constructor(
     private val _downloadThesisResult = MutableStateFlow<NetworkResult<File>?>(null)
     val downloadThesisResult: StateFlow<NetworkResult<File>?> = _downloadThesisResult
 
+    // Add network connectivity state
+    private val _isOnline = MutableStateFlow(networkConnectivityManager.isNetworkAvailable())
+    val isOnline: StateFlow<Boolean> = _isOnline
+
+    init {
+        // Observe network connectivity changes
+        viewModelScope.launch {
+            networkConnectivityManager.observeNetworkConnectivity().collect { isConnected ->
+                _isOnline.value = isConnected
+                Log.d("ThesisViewModel", "Network connectivity changed. Online: $isConnected")
+            }
+        }
+    }
+
     fun loadThesisDetails(thesisId: String) {
         viewModelScope.launch {
-            getThesisDetailsUseCase(thesisId).collectLatest { result ->
-                _thesisDetails.value = result
+            _thesisDetails.value = NetworkResult.Loading
+            try {
+                getThesisDetailsUseCase(thesisId).collect { result ->
+                    if (result is NetworkResult.Error && !_isOnline.value) {
+                        // Add offline information to error message when we're offline
+                        val offlineMessage = if (result.exception.message?.contains("No internet connection") == true) {
+                            result.exception.message ?: "No internet connection"
+                        } else {
+                            "You're offline. Some data may be out of date."
+                        }
+                        _thesisDetails.value = NetworkResult.Error(Exception(offlineMessage))
+                    } else {
+                        _thesisDetails.value = result
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle cancellation gracefully
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "loadThesisDetails job was cancelled")
+                } else {
+                    _thesisDetails.value = NetworkResult.Error(e)
+                    Log.e("ThesisViewModel", "Error loading thesis details", e)
+                }
             }
         }
     }
 
     fun loadFeedbackList(thesisId: String) {
         viewModelScope.launch {
-            getFeedbackForThesisUseCase(thesisId).collectLatest { result ->
-                _feedbackList.value = result
+            _feedbackList.value = NetworkResult.Loading
+            try {
+                getFeedbackForThesisUseCase(thesisId).collect { result ->
+                    _feedbackList.value = result
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "loadFeedbackList job was cancelled")
+                } else {
+                    _feedbackList.value = NetworkResult.Error(e)
+                    Log.e("ThesisViewModel", "Error loading feedback list", e)
+                }
             }
         }
     }
@@ -89,20 +136,29 @@ class ThesisViewModel @Inject constructor(
                 else -> submissionType.lowercase() // Fallback
             }
 
-            currentUser.value?.let { user ->
-                uploadThesisUseCase(
-                    context = context,
-                    title = title,
-                    description = description,
-                    fileUri = fileUri,
-                    submissionType = apiSubmissionType,
-                    currentUser = user,
-                    advisorId = advisorId
-                ).collectLatest { result ->
-                    _uploadThesisResult.value = result
+            try {
+                currentUser.value?.let { user ->
+                    uploadThesisUseCase(
+                        context = context,
+                        title = title,
+                        description = description,
+                        fileUri = fileUri,
+                        submissionType = apiSubmissionType,
+                        currentUser = user,
+                        advisorId = advisorId
+                    ).collect { result ->
+                        _uploadThesisResult.value = result
+                    }
+                } ?: run {
+                    _uploadThesisResult.value = NetworkResult.Error(Exception("User not authenticated"))
                 }
-            } ?: run {
-                _uploadThesisResult.value = NetworkResult.Error(Exception("User not authenticated"))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "uploadThesis job was cancelled")
+                } else {
+                    _uploadThesisResult.value = NetworkResult.Error(e)
+                    Log.e("ThesisViewModel", "Error uploading thesis", e)
+                }
             }
         }
     }
@@ -125,24 +181,57 @@ class ThesisViewModel @Inject constructor(
                 else -> submissionType.lowercase() // Fallback
             }
 
-            updateThesisUseCase(
-                context = context,
-                thesisId = thesisId,
-                title = title,
-                description = description,
-                submissionType = apiSubmissionType,
-                fileUri = fileUri
-            ).collectLatest { result ->
-                _updateThesisResult.value = result
+            try {
+                updateThesisUseCase(
+                    context = context,
+                    thesisId = thesisId,
+                    title = title,
+                    description = description,
+                    submissionType = apiSubmissionType,
+                    fileUri = fileUri
+                ).collect { result ->
+                    _updateThesisResult.value = result
+                    
+                    // Show success message
+                    if (result is NetworkResult.Success) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Thesis updated successfully",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "updateThesis job was cancelled")
+                } else {
+                    _updateThesisResult.value = NetworkResult.Error(e)
+                    Log.e("ThesisViewModel", "Error updating thesis", e)
+                    
+                    // Show error message
+                    android.widget.Toast.makeText(
+                        context,
+                        "Error updating thesis",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
 
     fun updateThesisStatus(thesisId: String, newStatus: String) {
         viewModelScope.launch {
-            updateThesisStatusUseCase(thesisId, newStatus).collectLatest { result ->
-                if (result is NetworkResult.Success) {
-                    _thesisDetails.value = result
+            try {
+                updateThesisStatusUseCase(thesisId, newStatus).collect { result ->
+                    if (result is NetworkResult.Success) {
+                        _thesisDetails.value = result
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "updateThesisStatus job was cancelled")
+                } else {
+                    Log.e("ThesisViewModel", "Error updating thesis status", e)
                 }
             }
         }
@@ -152,8 +241,17 @@ class ThesisViewModel @Inject constructor(
         viewModelScope.launch {
             _downloadThesisResult.value = NetworkResult.Loading
 
-            downloadThesisUseCase(thesisId, context).collectLatest { result ->
-                _downloadThesisResult.value = result
+            try {
+                downloadThesisUseCase(thesisId, context).collect { result ->
+                    _downloadThesisResult.value = result
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.d("ThesisViewModel", "downloadThesis job was cancelled")
+                } else {
+                    _downloadThesisResult.value = NetworkResult.Error(e)
+                    Log.e("ThesisViewModel", "Error downloading thesis", e)
+                }
             }
         }
     }
@@ -172,16 +270,13 @@ class ThesisViewModel @Inject constructor(
 
     /**
      * Check if the user is properly authenticated before performing thesis operations
-     * Logs the authentication state for debugging
      * @return true if authenticated, false otherwise
      */
     fun checkAuthentication(): Boolean {
         val isAuthenticated = currentUser.value != null
         if (!isAuthenticated) {
             // Log for debugging
-            android.util.Log.w("ThesisViewModel", "User is not authenticated")
-        } else {
-            android.util.Log.d("ThesisViewModel", "User is authenticated: ${currentUser.value?.email}")
+            Log.w("ThesisViewModel", "User is not authenticated")
         }
         return isAuthenticated
     }
@@ -192,5 +287,13 @@ class ThesisViewModel @Inject constructor(
      */
     fun validateSession(): User? {
         return currentUser.value
+    }
+
+    /**
+     * Checks if device is currently online. This can be used in UI 
+     * to display connectivity status or disable features that require connectivity.
+     */
+    fun isDeviceOnline(): Boolean {
+        return networkConnectivityManager.isNetworkAvailable()
     }
 }

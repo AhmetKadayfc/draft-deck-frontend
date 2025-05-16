@@ -1,6 +1,5 @@
 package com.example.draftdeck.ui.thesis
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,16 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,12 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.draftdeck.data.model.Thesis
-import com.example.draftdeck.data.model.User
 import com.example.draftdeck.data.remote.NetworkResult
 import com.example.draftdeck.domain.util.Constants
 import com.example.draftdeck.ui.components.DraftDeckAppBar
@@ -79,7 +71,7 @@ fun UploadThesisScreen(
     LaunchedEffect(Unit) {
         if (!viewModel.checkAuthentication()) {
             // Should be handled by auth interceptor, but add this as a fallback
-            onBackClick()
+//            onBackClick()
         }
     }
     
@@ -96,22 +88,27 @@ fun UploadThesisScreen(
             val thesis = (thesisDetails as NetworkResult.Success<Thesis>).data
             title = thesis.title
             description = thesis.description
-            submissionType = thesis.submissionType
+            
+            // Convert API submission type to display format if needed
+            submissionType = when(thesis.submissionType.lowercase()) {
+                Constants.THESIS_TYPE_DRAFT -> Constants.THESIS_TYPE_DRAFT_DISPLAY
+                Constants.THESIS_TYPE_FINAL -> Constants.THESIS_TYPE_FINAL_DISPLAY
+                else -> thesis.submissionType
+            }
         }
     }
     
     // Handle successful upload/update
     LaunchedEffect(uploadResult, updateResult) {
-        when {
-            uploadResult is NetworkResult.Success -> {
-                viewModel.resetUploadResult()
-                onSuccessNavigate()
-            }
-            updateResult is NetworkResult.Success -> {
-                viewModel.resetUpdateResult()
-                onSuccessNavigate()
-            }
+        if (uploadResult is NetworkResult.Success) {
+            viewModel.resetUploadResult()
+            onSuccessNavigate()
+        } 
+        else if (updateResult is NetworkResult.Success) {
+            viewModel.resetUpdateResult()
+            onSuccessNavigate()
         }
+        // Do nothing for other states - don't navigate away
     }
 
     // File picker

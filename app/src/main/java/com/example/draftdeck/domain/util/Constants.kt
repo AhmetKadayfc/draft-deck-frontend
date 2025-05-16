@@ -32,6 +32,12 @@ object Constants {
     const val STATUS_APPROVED = "approved"
     const val STATUS_REJECTED = "rejected"
     
+    // Display-friendly status values (for UI)
+    const val STATUS_PENDING_DISPLAY = "Pending"
+    const val STATUS_REVIEWED_DISPLAY = "Reviewed"
+    const val STATUS_APPROVED_DISPLAY = "Approved"
+    const val STATUS_REJECTED_DISPLAY = "Rejected"
+    
     // Thesis Types - MUST be lowercase to match API expectations
     const val THESIS_TYPE_DRAFT = "draft"
     const val THESIS_TYPE_FINAL = "final"

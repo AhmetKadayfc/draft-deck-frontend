@@ -66,6 +66,17 @@ fun AssignAdvisorResponse.toThesis(): Thesis {
 fun ThesisDto.toThesis(): Thesis {
     val safeId = id ?: java.util.UUID.randomUUID().toString()
     
+    // Determine file type from file name or set default
+    val fileType = when {
+        fileName?.endsWith(".pdf", ignoreCase = true) == true -> "pdf"
+        fileName?.endsWith(".docx", ignoreCase = true) == true -> "docx"
+        // Check fileUrl as fallback
+        fileUrl?.endsWith(".pdf", ignoreCase = true) == true -> "pdf"
+        fileUrl?.endsWith(".docx", ignoreCase = true) == true -> "docx"
+        // Default to empty if no info available
+        else -> ""
+    }
+    
     return Thesis(
         id = safeId,
         title = title ?: "Untitled Thesis",
@@ -76,9 +87,7 @@ fun ThesisDto.toThesis(): Thesis {
         advisorName = advisorName ?: "",
         submissionType = submissionType ?: "draft",
         fileUrl = fileUrl ?: "",
-        fileType = fileName?.substringAfterLast(".")?.let { 
-            if (it.equals("pdf", ignoreCase = true)) "pdf" else "docx" 
-        } ?: "",
+        fileType = fileType,
         version = version ?: 1,
         status = status ?: "pending",
         submissionDate = submissionDate ?: createdAt ?: Date(),

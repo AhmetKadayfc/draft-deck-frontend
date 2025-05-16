@@ -174,8 +174,12 @@ fun ThesisStatusBadge(
         modifier = modifier
     ) {
         Text(
-            text = status.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+            text = when(status.lowercase()) {
+                Constants.STATUS_PENDING -> Constants.STATUS_PENDING_DISPLAY
+                Constants.STATUS_REVIEWED -> Constants.STATUS_REVIEWED_DISPLAY
+                Constants.STATUS_APPROVED -> Constants.STATUS_APPROVED_DISPLAY
+                Constants.STATUS_REJECTED -> Constants.STATUS_REJECTED_DISPLAY
+                else -> status.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             },
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

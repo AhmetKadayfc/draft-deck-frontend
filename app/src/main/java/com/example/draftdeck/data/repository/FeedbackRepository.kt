@@ -13,6 +13,7 @@ import com.example.draftdeck.data.remote.api.CreateFeedbackRequest
 import com.example.draftdeck.data.remote.api.FeedbackApi
 import com.example.draftdeck.data.remote.api.InlineCommentRequest
 import com.example.draftdeck.data.remote.dto.toFeedback
+import com.example.draftdeck.data.remote.dto.toFeedbackList
 import com.example.draftdeck.domain.util.FileHelper
 import com.example.draftdeck.domain.util.NetworkConnectivityManager
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +72,7 @@ class FeedbackRepositoryImpl @Inject constructor(
             remoteDataSource = {
                 val response = feedbackApi.getFeedbackForThesis(thesisId)
                 if (response.isSuccessful) {
-                    response.body()?.map { it.toFeedback() } ?: throw IOException("Empty response body")
+                    response.body()?.toFeedbackList() ?: throw IOException("Empty response body")
                 } else {
                     throw HttpException(response)
                 }

@@ -1,6 +1,7 @@
 package com.example.draftdeck.data.remote.api
 
 import com.example.draftdeck.data.remote.dto.FeedbackDto
+import com.example.draftdeck.data.remote.dto.FeedbackListResponseDto
 import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.http.Body
@@ -43,7 +44,7 @@ data class InlineCommentRequest(
 
 interface FeedbackApi {
     @GET("feedback/thesis/{thesisId}")
-    suspend fun getFeedbackForThesis(@Path("thesisId") thesisId: String): Response<List<FeedbackDto>>
+    suspend fun getFeedbackForThesis(@Path("thesisId") thesisId: String): Response<FeedbackListResponseDto>
 
     @GET("feedback/{feedbackId}")
     suspend fun getFeedbackById(@Path("feedbackId") feedbackId: String): Response<FeedbackDto>
